@@ -1,4 +1,4 @@
-// src/services/api.js
+// src/services/api.ts
 
 /**
  * Real API service communicating with Jules API.
@@ -6,7 +6,38 @@
 
 const BASE_URL = 'https://jules.googleapis.com/v1alpha';
 
-export const getSources = async (apiKey) => {
+export interface Source {
+  name: string;
+  id?: string;
+  githubRepo?: {
+    owner: string;
+    repo: string;
+  };
+}
+
+export interface Session {
+  name: string;
+  title?: string;
+  prompt?: string;
+  sourceContext?: {
+    source: string;
+  };
+}
+
+export interface Activity {
+  id: string;
+  createTime: string;
+  originator: string;
+  planApproved?: boolean;
+  progressUpdated?: {
+    title: string;
+    description?: string;
+  };
+  planGenerated?: boolean;
+  sessionCompleted?: boolean;
+}
+
+export const getSources = async (apiKey: string): Promise<{ sources: Source[] }> => {
   try {
     const response = await fetch(`${BASE_URL}/sources`, {
       method: 'GET',
@@ -27,7 +58,7 @@ export const getSources = async (apiKey) => {
   }
 };
 
-export const getSessions = async (apiKey) => {
+export const getSessions = async (apiKey: string): Promise<{ sessions: Session[] }> => {
   try {
     const response = await fetch(`${BASE_URL}/sessions?pageSize=20`, {
       method: 'GET',
@@ -48,9 +79,9 @@ export const getSessions = async (apiKey) => {
   }
 };
 
-export const createSession = async (apiKey, source, initialPrompt) => {
+export const createSession = async (apiKey: string, source: string, initialPrompt: string): Promise<Session> => {
   try {
-    const body = {
+    const body: any = {
       prompt: initialPrompt,
     };
     
@@ -85,7 +116,7 @@ export const createSession = async (apiKey, source, initialPrompt) => {
   }
 };
 
-export const sendMessageToJules = async (apiKey, sessionId, message) => {
+export const sendMessageToJules = async (apiKey: string, sessionId: string, message: string): Promise<boolean> => {
   try {
     const response = await fetch(`${BASE_URL}/sessions/${sessionId}:sendMessage`, {
       method: 'POST',
@@ -111,7 +142,7 @@ export const sendMessageToJules = async (apiKey, sessionId, message) => {
   }
 };
 
-export const pollActivities = async (apiKey, sessionId) => {
+export const pollActivities = async (apiKey: string, sessionId: string): Promise<{ activities: Activity[] }> => {
   try {
     const response = await fetch(`${BASE_URL}/sessions/${sessionId}/activities?pageSize=50`, {
       method: 'GET',

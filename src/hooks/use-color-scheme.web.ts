@@ -8,7 +8,11 @@ export function useColorScheme() {
   const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
-    setHasHydrated(true);
+    // Avoid synchronous state updates during initial render phase
+    const timeout = setTimeout(() => {
+      setHasHydrated(true);
+    }, 0);
+    return () => clearTimeout(timeout);
   }, []);
 
   const colorScheme = useRNColorScheme();
