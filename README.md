@@ -40,12 +40,12 @@ This project is configured with GitHub Actions to automatically build and releas
 ### How to trigger a build:
 
 1. **Via Tag (Recommended):**
-   Push a new Git tag starting with `v` (e.g., `v1.0.0`) to your repository.
+   Push a new Git tag starting with `v` (e.g., `v1.0.0`) or a version number (e.g., `1.0.0`) to your repository.
    ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
+   git tag v1.0.0 # or 1.0.0
+   git push origin v1.0.0 # or 1.0.0
    ```
-   *Alternatively, you can create a new release on GitHub and create the tag `v1.0.0` from the UI.*
+   *Alternatively, you can create a new release on GitHub and create the tag from the UI.*
 
 2. **Manual Trigger:**
    Go to the **Actions** tab on your GitHub repository page. Select the **Build and Release Android APK** workflow, and click the **Run workflow** button.
