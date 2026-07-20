@@ -7,7 +7,6 @@ import {
   TouchableOpacity, 
   SafeAreaView,
   ActivityIndicator,
-  Modal,
   ScrollView
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -21,7 +20,13 @@ export default function MenuScreen() {
   const [apiKey, setApiKeyState] = useState('');
   
   const [sources, setSources] = useState<Source[]>([]);
+  const [sourcesNextPageToken, setSourcesNextPageToken] = useState<string | undefined>();
+  const [isLoadingMoreSources, setIsLoadingMoreSources] = useState(false);
+
   const [recentSessions, setRecentSessions] = useState<Session[]>([]);
+  const [sessionsNextPageToken, setSessionsNextPageToken] = useState<string | undefined>();
+  const [isLoadingMoreSessions, setIsLoadingMoreSessions] = useState(false);
+  
   const [isLoadingMenuData, setIsLoadingMenuData] = useState(false);
 
   const fetchMenuData = async (keyToUse: string = apiKey) => {
@@ -34,21 +39,57 @@ export default function MenuScreen() {
       const sourcesResult = await getSources(keyToUse);
       if (sourcesResult && sourcesResult.sources) {
         setSources(sourcesResult.sources);
+        setSourcesNextPageToken(sourcesResult.nextPageToken);
       } else {
         setSources([]);
+        setSourcesNextPageToken(undefined);
       }
       
       const sessionsResult = await getSessions(keyToUse);
       if (sessionsResult && sessionsResult.sessions) {
         setRecentSessions(sessionsResult.sessions);
+        setSessionsNextPageToken(sessionsResult.nextPageToken);
       } else {
         setRecentSessions([]);
+        setSessionsNextPageToken(undefined);
       }
     } catch (error) {
       console.error("Error fetching menu data:", error);
       alert('Failed to fetch data. Please check your API Key.');
     } finally {
       setIsLoadingMenuData(false);
+    }
+  };
+
+  const loadMoreSources = async () => {
+    if (!apiKey || !sourcesNextPageToken) return;
+    setIsLoadingMoreSources(true);
+    try {
+      const result = await getSources(apiKey, sourcesNextPageToken);
+      if (result && result.sources) {
+        setSources(prev => [...prev, ...result.sources]);
+        setSourcesNextPageToken(result.nextPageToken);
+      }
+    } catch (error) {
+      console.error("Error loading more sources:", error);
+    } finally {
+      setIsLoadingMoreSources(false);
+    }
+  };
+
+  const loadMoreSessions = async () => {
+    if (!apiKey || !sessionsNextPageToken) return;
+    setIsLoadingMoreSessions(true);
+    try {
+      const result = await getSessions(apiKey, sessionsNextPageToken);
+      if (result && result.sessions) {
+        setRecentSessions(prev => [...prev, ...result.sessions]);
+        setSessionsNextPageToken(result.nextPageToken);
+      }
+    } catch (error) {
+      console.error("Error loading more sessions:", error);
+    } finally {
+      setIsLoadingMoreSessions(false);
     }
   };
 
@@ -101,7 +142,7 @@ export default function MenuScreen() {
           {isLoadingMenuData ? (
              <ActivityIndicator size="large" color="#007AFF" style={{marginTop: 50}}/>
           ) : (
-             <ScrollView style={styles.menuScroll}>
+             <ScrollView style={styles.menuScroll} contentContainerStyle={{ paddingBottom: 100 }}>
                 <TouchableOpacity style={styles.emptySessionCard} onPress={startEmptySession}>
                     <Text style={styles.emptySessionTitle}>+ Start Empty Session</Text>
                     <Text style={styles.emptySessionSub}>No codebase bound</Text>
@@ -116,11 +157,21 @@ export default function MenuScreen() {
                        onPress={() => startSessionWithCodebase(src.name)}
                     >
                        <Text style={styles.menuItemTitle}>
-                           {src.githubRepo ? `${src.githubRepo.owner}/${src.githubRepo.repo}` : src.id}
+                           {src.id || src.name}
                        </Text>
-                       <Text style={styles.menuItemSub}>Create session</Text>
+                       {src.githubRepo ? (
+                           <Text style={styles.menuItemSub}>{src.githubRepo.owner}/{src.githubRepo.repo}</Text>
+                       ) : (
+                           <Text style={styles.menuItemSub}>Create session</Text>
+                       )}
                     </TouchableOpacity>
                 ))}
+
+                {sourcesNextPageToken ? (
+                    <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreSources} disabled={isLoadingMoreSources}>
+                        <Text style={styles.loadMoreText}>{isLoadingMoreSources ? 'Loading...' : 'Load More'}</Text>
+                    </TouchableOpacity>
+                ) : null}
 
                 <Text style={styles.sectionHeader}>Recent Sessions</Text>
                 {recentSessions.length === 0 ? <Text style={styles.emptyText}>No recent sessions.</Text> : null}
@@ -136,20 +187,30 @@ export default function MenuScreen() {
                                Repo: {sess.sourceContext.source.split('/').pop()}
                            </Text>
                        )}
-                       <Text style={styles.menuItemTime}>ID: {sess.name.split('/')[1]}</Text>
+                       <Text style={styles.menuItemTime}>
+                          {sess.createTime ? new Date(sess.createTime).toLocaleString() : ''}
+                          {sess.state ? ` • ${sess.state}` : ''}
+                          {` • ID: ${sess.name.split('/')[1]}`}
+                       </Text>
                     </TouchableOpacity>
                 ))}
+
+                {sessionsNextPageToken ? (
+                    <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreSessions} disabled={isLoadingMoreSessions}>
+                        <Text style={styles.loadMoreText}>{isLoadingMoreSessions ? 'Loading...' : 'Load More'}</Text>
+                    </TouchableOpacity>
+                ) : null}
              </ScrollView>
           )}
       </View>
 
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={showSettings}
-        onRequestClose={() => setShowSettings(false)}
-      >
+      {showSettings && (
         <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setShowSettings(false)}
+          />
           <View style={styles.modalView}>
             <Text style={styles.modalTitle}>Global Settings</Text>
             
@@ -162,15 +223,23 @@ export default function MenuScreen() {
               secureTextEntry
             />
 
-            <TouchableOpacity
-              style={[styles.sendButton, {marginTop: 25, width: '100%'}]}
-              onPress={handleSaveApiKey}
-            >
-              <Text style={styles.sendButtonText}>Save & Close</Text>
-            </TouchableOpacity>
+            <View style={styles.modalButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowSettings(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSaveApiKey}
+              >
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -216,11 +285,64 @@ const styles = StyleSheet.create({
   menuItemSub: { fontSize: 14, color: '#666', marginTop: 4 },
   menuItemTime: { fontSize: 12, color: '#999', marginTop: 8 },
   emptyText: { color: '#999', fontStyle: 'italic', marginBottom: 20, paddingHorizontal: 5 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalView: { width: '85%', backgroundColor: 'white', borderRadius: 20, padding: 25, alignItems: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
+  loadMoreButton: { padding: 10, alignItems: 'center', marginBottom: 20 },
+  loadMoreText: { color: '#007AFF', fontWeight: 'bold' },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalView: {
+    width: '85%',
+    maxWidth: 500,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 25,
+    alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, alignSelf: 'center' },
   label: { fontSize: 16, fontWeight: 'bold', marginTop: 10, marginBottom: 8 },
   modalInput: { width: '100%', backgroundColor: '#f0f0f0', borderRadius: 10, padding: 15, fontSize: 16 },
-  sendButton: { backgroundColor: '#007AFF', borderRadius: 20, paddingVertical: 10, paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center' },
-  sendButtonText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
+  modalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 25,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#e0e0e0',
+    marginRight: 10,
+  },
+  cancelButtonText: {
+    color: '#333333',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+    marginLeft: 10,
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
