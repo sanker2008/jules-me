@@ -147,9 +147,16 @@ export default function MenuScreen() {
   };
 
   const resumeSession = (existingSession: Session) => {
-    const extractedId = existingSession.name.split('/')[1];
-    const sourceId = existingSession.sourceContext?.source || '';
-    router.push({ pathname: '/chat', params: { sessionId: extractedId, sourceId: sourceId } });
+    const extractedId = existingSession.name.includes('/') 
+      ? existingSession.name.split('/')[1] 
+      : existingSession.name;
+      
+    const params: any = { sessionId: extractedId };
+    if (existingSession.sourceContext?.source) {
+      params.sourceId = existingSession.sourceContext.source;
+    }
+    
+    router.push({ pathname: '/chat', params });
   };
 
   return (
