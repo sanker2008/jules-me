@@ -49,7 +49,7 @@ export default function ChatScreen() {
                  newMessages.push({
                      id: act.id,
                      activityId: act.id,
-                     text: '',
+                     text: '✓ You approved the execution plan.',
                      sender: 'user',
                      timestamp: act.createTime,
                      planApproved: true
@@ -94,9 +94,11 @@ export default function ChatScreen() {
   const startPolling = (currentApiKey: string, currentSessionId: string) => {
     if (pollIntervalId) clearInterval(pollIntervalId);
 
+    let consecutiveErrors = 0;
     const intervalId = setInterval(async () => {
         try {
             const result = await pollActivities(currentApiKey, currentSessionId);
+            consecutiveErrors = 0;
             if (result && result.activities && result.activities.length > 0) {
                const agentActivities = result.activities.filter(a => a.originator === 'agent');
                if (agentActivities.length > 0) {
@@ -143,10 +145,21 @@ export default function ChatScreen() {
                }
             }
         } catch(e) {
-             console.error("Polling error", e);
-             clearInterval(intervalId);
-             setPollIntervalId(null);
-             setIsTyping(false);
+             consecutiveErrors++;
+             if (consecutiveErrors >= 3) {
+                 console.error("Too many polling errors, stopping.", e);
+                 setMessages(prev => [...prev, {
+                     id: Date.now().toString(),
+                     text: 'Failed to sync with Jules. Please refresh.',
+                     sender: 'jules',
+                     timestamp: new Date().toISOString()
+                 }]);
+                 clearInterval(intervalId);
+                 setPollIntervalId(null);
+                 setIsTyping(false);
+             } else {
+                 console.warn("Polling error, retrying...", e);
+             }
         }
     }, 5000);
 
