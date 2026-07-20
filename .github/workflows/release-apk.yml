@@ -22,6 +22,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild Android project
+        run: npx expo prebuild --platform android --clean
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -31,12 +37,6 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prebuild Android project
-        run: npx expo prebuild --platform android --clean
 
       - name: Build Android Release APK
         working-directory: android
