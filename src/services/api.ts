@@ -19,6 +19,9 @@ export interface Session {
   name: string;
   title?: string;
   prompt?: string;
+  state?: string;
+  createTime?: string;
+  updateTime?: string;
   sourceContext?: {
     source: string;
   };
@@ -37,9 +40,13 @@ export interface Activity {
   sessionCompleted?: boolean;
 }
 
-export const getSources = async (apiKey: string): Promise<{ sources: Source[] }> => {
+export const getSources = async (apiKey: string, pageToken?: string): Promise<{ sources: Source[], nextPageToken?: string }> => {
   try {
-    const response = await fetch(`${BASE_URL}/sources`, {
+    let url = `${BASE_URL}/sources`;
+    if (pageToken) {
+      url += `?pageToken=${pageToken}`;
+    }
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'X-Goog-Api-Key': apiKey,
@@ -58,9 +65,34 @@ export const getSources = async (apiKey: string): Promise<{ sources: Source[] }>
   }
 };
 
-export const getSessions = async (apiKey: string): Promise<{ sessions: Session[] }> => {
+export const getSource = async (apiKey: string, sourceId: string): Promise<Source> => {
   try {
-    const response = await fetch(`${BASE_URL}/sessions?pageSize=20`, {
+    const response = await fetch(`${BASE_URL}/${sourceId}`, {
+      method: 'GET',
+      headers: {
+        'X-Goog-Api-Key': apiKey,
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch source: ${response.status} ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("getSource error:", error);
+    throw error;
+  }
+};
+
+export const getSessions = async (apiKey: string, pageToken?: string): Promise<{ sessions: Session[], nextPageToken?: string }> => {
+  try {
+    let url = `${BASE_URL}/sessions?pageSize=20`;
+    if (pageToken) {
+      url += `&pageToken=${pageToken}`;
+    }
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'X-Goog-Api-Key': apiKey,
@@ -75,6 +107,27 @@ export const getSessions = async (apiKey: string): Promise<{ sessions: Session[]
     return await response.json();
   } catch (error) {
     console.error("getSessions error:", error);
+    throw error;
+  }
+};
+
+export const getSession = async (apiKey: string, sessionId: string): Promise<Session> => {
+  try {
+    const response = await fetch(`${BASE_URL}/sessions/${sessionId}`, {
+      method: 'GET',
+      headers: {
+        'X-Goog-Api-Key': apiKey,
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch session: ${response.status} ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("getSession error:", error);
     throw error;
   }
 };
@@ -142,9 +195,13 @@ export const sendMessageToJules = async (apiKey: string, sessionId: string, mess
   }
 };
 
-export const pollActivities = async (apiKey: string, sessionId: string): Promise<{ activities: Activity[] }> => {
+export const pollActivities = async (apiKey: string, sessionId: string, pageToken?: string): Promise<{ activities: Activity[], nextPageToken?: string }> => {
   try {
-    const response = await fetch(`${BASE_URL}/sessions/${sessionId}/activities?pageSize=50`, {
+    let url = `${BASE_URL}/sessions/${sessionId}/activities?pageSize=50`;
+    if (pageToken) {
+      url += `&pageToken=${pageToken}`;
+    }
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'X-Goog-Api-Key': apiKey,
@@ -159,6 +216,50 @@ export const pollActivities = async (apiKey: string, sessionId: string): Promise
     return await response.json();
   } catch (error) {
     console.error("pollActivities error:", error);
+    throw error;
+  }
+};
+
+export const getActivity = async (apiKey: string, sessionId: string, activityId: string): Promise<Activity> => {
+  try {
+    const response = await fetch(`${BASE_URL}/sessions/${sessionId}/activities/${activityId}`, {
+      method: 'GET',
+      headers: {
+        'X-Goog-Api-Key': apiKey,
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch activity: ${response.status} ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("getActivity error:", error);
+    throw error;
+  }
+};
+
+export const approvePlan = async (apiKey: string, sessionId: string): Promise<any> => {
+  try {
+    const response = await fetch(`${BASE_URL}/sessions/${sessionId}:approvePlan`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to approve plan: ${response.status} ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("approvePlan error:", error);
     throw error;
   }
 };
