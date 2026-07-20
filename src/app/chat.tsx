@@ -12,7 +12,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { createSession, sendMessageToJules, pollActivities, Activity } from '../services/api';
+import { createSession, sendMessageToJules, pollActivities, Activity, approvePlan } from '../services/api';
 import { getApiKey } from '../utils/secure-store';
 
 interface Message {
@@ -21,6 +21,8 @@ interface Message {
   text: string;
   sender: 'user' | 'jules';
   timestamp: string;
+  planGenerated?: boolean;
+  planApproved?: boolean;
 }
 
 export default function ChatScreen() {
@@ -33,6 +35,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const [pollIntervalId, setPollIntervalId] = useState<any>(null);
 
@@ -45,17 +48,21 @@ export default function ChatScreen() {
              if (act.planApproved) {
                  newMessages.push({
                      id: act.id,
-                     text: '[Plan Approved]',
+                     activityId: act.id,
+                     text: '',
                      sender: 'user',
-                     timestamp: act.createTime
+                     timestamp: act.createTime,
+                     planApproved: true
                  });
              }
           } else {
              let replyText = null;
+             let planGenerated = false;
              if (act.progressUpdated) {
                  replyText = `**${act.progressUpdated.title}**\n${act.progressUpdated.description || ''}`;
              } else if (act.planGenerated) {
                  replyText = "Generated a new execution plan.";
+                 planGenerated = true;
              } else if (act.sessionCompleted) {
                  replyText = "✅ Session completed successfully!";
              }
@@ -66,7 +73,8 @@ export default function ChatScreen() {
                      activityId: act.id,
                      text: replyText,
                      sender: 'jules',
-                     timestamp: act.createTime
+                     timestamp: act.createTime,
+                     planGenerated
                  });
              }
           }
@@ -96,11 +104,13 @@ export default function ChatScreen() {
 
                    let replyText = null;
                    let isCompleted = false;
+                   let planGenerated = false;
 
                    if (latest.progressUpdated) {
                        replyText = `**${latest.progressUpdated.title}**\n${latest.progressUpdated.description || ''}`;
                    } else if (latest.planGenerated) {
                        replyText = "Generated a new execution plan.";
+                       planGenerated = true;
                    } else if (latest.sessionCompleted) {
                        replyText = "✅ Session completed successfully!";
                        isCompleted = true;
@@ -118,7 +128,8 @@ export default function ChatScreen() {
                              activityId: latest.id,
                              text: replyText,
                              sender: 'jules',
-                             timestamp: new Date().toISOString()
+                             timestamp: new Date().toISOString(),
+                             planGenerated
                          }];
                      });
                    }
@@ -233,13 +244,49 @@ export default function ChatScreen() {
     }
   };
 
+  const handleApprovePlan = async () => {
+    if (!apiKey || !sessionId) return;
+    setIsApproving(true);
+    try {
+      await approvePlan(apiKey, sessionId);
+      setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          text: '',
+          sender: 'user',
+          timestamp: new Date().toISOString(),
+          planApproved: true
+      }]);
+    } catch (e) {
+      console.error("Failed to approve plan", e);
+      alert('Failed to approve plan.');
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isUser = item.sender === 'user';
     return (
       <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.julesBubble]}>
-        <Text style={[styles.messageText, isUser ? styles.userText : styles.julesText]}>
-          {item.text}
-        </Text>
+        {item.text ? (
+            <Text style={[styles.messageText, isUser ? styles.userText : styles.julesText]}>
+              {item.text}
+            </Text>
+        ) : null}
+        {item.planGenerated && (
+            <TouchableOpacity 
+                style={styles.approveButton}
+                onPress={handleApprovePlan}
+                disabled={isApproving}
+            >
+                {isApproving ? <ActivityIndicator size="small" color="#ffffff" /> : <Text style={styles.approveButtonText}>✅ Approve Plan</Text>}
+            </TouchableOpacity>
+        )}
+        {item.planApproved && (
+            <View style={[styles.approveButton, styles.approveButtonDisabled]}>
+                <Text style={styles.approveButtonDisabledText}>Plan Approved ✓</Text>
+            </View>
+        )}
       </View>
     );
   };
@@ -340,4 +387,8 @@ const styles = StyleSheet.create({
   sendButton: { marginLeft: 10, marginBottom: 5, backgroundColor: '#007AFF', borderRadius: 20, paddingVertical: 10, paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center' },
   sendButtonDisabled: { backgroundColor: '#b3d4ff' },
   sendButtonText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
+  approveButton: { marginTop: 10, backgroundColor: '#28a745', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center' },
+  approveButtonDisabled: { backgroundColor: '#e0e0e0' },
+  approveButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  approveButtonDisabledText: { color: '#888888', fontSize: 14, fontWeight: '600' },
 });
