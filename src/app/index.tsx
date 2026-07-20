@@ -13,6 +13,33 @@ import { useRouter } from 'expo-router';
 import { getSources, getSessions, Source, Session } from '../services/api';
 import { getApiKey, saveApiKey } from '../utils/secure-store';
 
+function getRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) {
+    return 'just now';
+  }
+
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes}m ago`;
+  }
+
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) {
+    return `${diffInHours}h ago`;
+  }
+
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays === 1) {
+    return 'yesterday';
+  }
+
+  return date.toLocaleString();
+}
+
 export default function MenuScreen() {
   const router = useRouter();
 
@@ -31,7 +58,6 @@ export default function MenuScreen() {
 
   const fetchMenuData = async (keyToUse: string = apiKey) => {
     if (!keyToUse) {
-      alert('Please configure your Jules API Key in Settings (⚙️) first.');
       return;
     }
     setIsLoadingMenuData(true);
@@ -99,6 +125,8 @@ export default function MenuScreen() {
       if (key) {
         setApiKeyState(key);
         fetchMenuData(key);
+      } else {
+        setShowSettings(true);
       }
     };
     loadKey();
@@ -130,6 +158,9 @@ export default function MenuScreen() {
           <View style={styles.menuHeader}>
             <Text style={styles.menuTitle}>Jules Workspace</Text>
             <View style={styles.menuActions}>
+               <TouchableOpacity onPress={startEmptySession} style={styles.iconButton}>
+                   <Text style={styles.iconText}>➕</Text>
+               </TouchableOpacity>
                <TouchableOpacity onPress={() => fetchMenuData(apiKey)} style={styles.iconButton}>
                    <Text style={styles.iconText}>🔄</Text>
                </TouchableOpacity>
@@ -141,13 +172,10 @@ export default function MenuScreen() {
 
           {isLoadingMenuData ? (
              <ActivityIndicator size="large" color="#007AFF" style={{marginTop: 50}}/>
+          ) : !apiKey ? (
+             <Text style={{ textAlign: 'center', marginTop: 50, color: '#666', fontSize: 16 }}>Please configure your API key to load your workspace.</Text>
           ) : (
              <ScrollView style={styles.menuScroll} contentContainerStyle={{ paddingBottom: 100 }}>
-                <TouchableOpacity style={styles.emptySessionCard} onPress={startEmptySession}>
-                    <Text style={styles.emptySessionTitle}>+ Start Empty Session</Text>
-                    <Text style={styles.emptySessionSub}>No codebase bound</Text>
-                </TouchableOpacity>
-
                 <Text style={styles.sectionHeader}>Your Codebases</Text>
                 {sources.length === 0 ? <Text style={styles.emptyText}>No codebases found.</Text> : null}
                 {sources.map(src => (
@@ -188,7 +216,7 @@ export default function MenuScreen() {
                            </Text>
                        )}
                        <Text style={styles.menuItemTime}>
-                          {sess.createTime ? new Date(sess.createTime).toLocaleString() : ''}
+                          {sess.createTime ? getRelativeTime(sess.createTime) : ''}
                           {sess.state ? ` • ${sess.state}` : ''}
                           {` • ID: ${sess.name.split('/')[1]}`}
                        </Text>
@@ -207,7 +235,7 @@ export default function MenuScreen() {
       {showSettings && (
         <View style={styles.modalOverlay}>
           <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             activeOpacity={1}
             onPress={() => setShowSettings(false)}
           />
@@ -261,17 +289,6 @@ const styles = StyleSheet.create({
   iconButton: { padding: 10, marginLeft: 5 },
   iconText: { fontSize: 20 },
   menuScroll: { flex: 1, padding: 15 },
-  emptySessionCard: {
-      backgroundColor: '#f0f8ff',
-      padding: 20,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: '#cce0ff',
-      marginBottom: 20,
-      alignItems: 'center',
-  },
-  emptySessionTitle: { fontSize: 18, fontWeight: 'bold', color: '#007AFF' },
-  emptySessionSub: { fontSize: 14, color: '#666', marginTop: 5 },
   sectionHeader: { fontSize: 16, fontWeight: 'bold', color: '#888', marginTop: 10, marginBottom: 10, textTransform: 'uppercase' },
   menuItem: {
       backgroundColor: '#f9f9f9',
