@@ -1,20 +1,28 @@
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 const API_KEY_KEY = 'JULES_API_KEY';
 
 export async function saveApiKey(key: string) {
   try {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(API_KEY_KEY, key);
+      return;
+    }
     await SecureStore.setItemAsync(API_KEY_KEY, key);
   } catch (e) {
-    console.error('Failed to save API key to secure store', e);
+    console.error('Failed to save API key:', e);
   }
 }
 
 export async function getApiKey() {
   try {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(API_KEY_KEY);
+    }
     return await SecureStore.getItemAsync(API_KEY_KEY);
   } catch (e) {
-    console.error('Failed to read API key from secure store', e);
+    console.error('Failed to read API key:', e);
     return null;
   }
 }
