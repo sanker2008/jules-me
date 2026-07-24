@@ -11,6 +11,7 @@ jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
 
@@ -21,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -29,6 +30,15 @@ jobs:
 
       - name: Prebuild Android project
         run: npx expo prebuild --platform android --clean
+
+      - name: Configure Gradle memory
+        run: |
+          {
+            echo ''
+            echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8'
+            echo 'org.gradle.parallel=true'
+            echo 'org.gradle.daemon=false'
+          } >> android/gradle.properties
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -42,7 +52,7 @@ jobs:
 
       - name: Build Android Release APK
         working-directory: android
-        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a -Pandroid.enableMinifyInReleaseBuilds=true -Pandroid.enableShrinkResourcesInReleaseBuilds=true
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a -Pandroid.enableMinifyInReleaseBuilds=false -Pandroid.enableShrinkResourcesInReleaseBuilds=false
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
