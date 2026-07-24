@@ -96,8 +96,9 @@ jobs:
         run: >-
           ./gradlew assembleRelease --no-daemon
           -PreactNativeArchitectures=${{ matrix.abi }}
-          -Pandroid.enableMinifyInReleaseBuilds=false
-          -Pandroid.enableShrinkResourcesInReleaseBuilds=false
+          -Pandroid.enableMinifyInReleaseBuilds=true
+          -Pandroid.enableShrinkResourcesInReleaseBuilds=true
+          -Pexpo.useLegacyPackaging=true
 
       - name: Name APK
         env:
@@ -163,8 +164,9 @@ jobs:
         run: >-
           ./gradlew bundleRelease --no-daemon
           -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64
-          -Pandroid.enableMinifyInReleaseBuilds=false
-          -Pandroid.enableShrinkResourcesInReleaseBuilds=false
+          -Pandroid.enableMinifyInReleaseBuilds=true
+          -Pandroid.enableShrinkResourcesInReleaseBuilds=true
+          -Pexpo.useLegacyPackaging=false
 
       - name: Name AAB
         run: |
