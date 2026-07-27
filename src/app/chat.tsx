@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Activity,
   approvePlan,
@@ -162,6 +163,7 @@ export default function ChatScreen() {
   const [session, setSession] = useState<Session | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [inputText, setInputText] = useState('');
+  const [selectedImage, setSelectedImage] = useState<{ uri: string; base64?: string; mimeType?: string } | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -302,7 +304,7 @@ export default function ChatScreen() {
 
   const handleSend = async () => {
     const prompt = inputText.trim();
-    if (!prompt || isSending) return;
+    if ((!prompt && !selectedImage) || isSending) return;
     if (!apiKey) {
       setChatError(t('noApiKeySaved'));
       return;
@@ -314,23 +316,30 @@ export default function ChatScreen() {
     }
 
     const optimisticId = `local-${Date.now()}`;
+    const imagePayload = selectedImage?.base64 && selectedImage?.mimeType ? { data: selectedImage.base64, mimeType: selectedImage.mimeType } : undefined;
+    let optimisticText = prompt;
+    if (selectedImage) {
+        optimisticText = optimisticText ? `${optimisticText}\n[Image Attached]` : '[Image Attached]';
+    }
+
     setTimeline(current => [
       ...current,
-      { id: optimisticId, kind: 'user', text: prompt, timestamp: new Date().toISOString() },
+      { id: optimisticId, kind: 'user', text: optimisticText, timestamp: new Date().toISOString() },
     ]);
     setInputText('');
+    setSelectedImage(null);
     setChatError(null);
     setIsSending(true);
 
     try {
       if (!sessionId) {
-        const created = await createSession(apiKey, sourceId!, startingBranch!, prompt);
+        const created = await createSession(apiKey, sourceId!, startingBranch!, prompt, { image: imagePayload });
         const createdId = created.id || created.name.split('/').pop();
         if (!createdId) throw new Error(t('missingSessionId'));
         setSession(created);
         setSessionId(createdId);
       } else {
-        await sendMessageToJules(apiKey, sessionId, prompt);
+        await sendMessageToJules(apiKey, sessionId, prompt, imagePayload);
       }
     } catch (error) {
       setTimeline(current => current.filter(item => item.id !== optimisticId));
@@ -397,7 +406,28 @@ export default function ChatScreen() {
   const waitingForPlan = activeState === 'AWAITING_PLAN_APPROVAL';
   const waitingForFeedback = activeState === 'AWAITING_USER_FEEDBACK';
   const terminal = isTerminalState(activeState);
-  const canSend = Boolean(inputText.trim() && apiKey && (sessionId || (sourceId && startingBranch)) && !isSending && !terminal);
+  const canSend = Boolean((inputText.trim() || selectedImage) && apiKey && (sessionId || (sourceId && startingBranch)) && !isSending && !terminal);
+
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        base64: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImage({
+          uri: result.assets[0].uri,
+          base64: result.assets[0].base64 || undefined,
+          mimeType: result.assets[0].mimeType || 'image/jpeg',
+        });
+      }
+    } catch {
+      setChatError('Failed to select image.');
+    }
+  };
+
   const pullRequests = useMemo(
     () => session?.outputs?.flatMap(output => output.pullRequest ? [output.pullRequest] : []) ?? [],
     [session?.outputs],
@@ -786,27 +816,49 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.composerShell}>
-            <TextInput
-              accessibilityLabel={t('sendMessageToJules')}
-              style={styles.composerInput}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder={waitingForPlan ? t('adjustPlanPlaceholder') : t('replyPlaceholder')}
-              placeholderTextColor="#706A7C"
-              multiline
-              textAlignVertical="top"
-              maxLength={2000}
-            />
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={t('sendMessage')}
-              disabled={!canSend}
-              style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-              onPress={handleSend}
-            >
-              {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.sendButtonText}>{t('send')}</Text>}
-            </TouchableOpacity>
+          <View style={styles.composerContainer}>
+            {selectedImage && (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} />
+                <TouchableOpacity
+                  style={styles.imagePreviewRemove}
+                  onPress={() => setSelectedImage(null)}
+                >
+                  <Text style={styles.imagePreviewRemoveText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <View style={styles.composerShell}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Attach Image"
+                style={styles.attachButton}
+                onPress={handlePickImage}
+                disabled={isSending}
+              >
+                <Text style={styles.attachButtonText}>+</Text>
+              </TouchableOpacity>
+              <TextInput
+                accessibilityLabel={t('sendMessageToJules')}
+                style={styles.composerInput}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder={waitingForPlan ? t('adjustPlanPlaceholder') : t('replyPlaceholder')}
+                placeholderTextColor="#706A7C"
+                multiline
+                textAlignVertical="top"
+                maxLength={2000}
+              />
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('sendMessage')}
+                disabled={!canSend}
+                style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+                onPress={handleSend}
+              >
+                {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.sendButtonText}>{t('send')}</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </KeyboardAvoidingView>
@@ -917,7 +969,14 @@ const styles = StyleSheet.create({
   errorNoticeText: { color: '#AA3027', fontSize: 13, lineHeight: 18, textAlign: 'center' },
   workingIndicator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 9, backgroundColor: '#F1EFFF' },
   workingIndicatorText: { color: '#6255AD', fontSize: 12, fontWeight: '700' },
-  composerShell: { flexDirection: 'row', alignItems: 'stretch', gap: 10, paddingHorizontal: 13, paddingVertical: 10, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E9E6F1' },
+  composerContainer: { backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E9E6F1', flexDirection: 'column' },
+  imagePreviewContainer: { paddingHorizontal: 13, paddingTop: 10, flexDirection: 'row' },
+  imagePreview: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#F4F2FA' },
+  imagePreviewRemove: { position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.5)', width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginLeft: -10 },
+  imagePreviewRemoveText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
+  composerShell: { flexDirection: 'row', alignItems: 'stretch', gap: 10, paddingHorizontal: 13, paddingVertical: 10 },
+  attachButton: { width: 44, minHeight: 56, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F3FA', borderWidth: 1, borderColor: '#E5E2EC' },
+  attachButtonText: { color: '#6656D7', fontSize: 24, fontWeight: '400', marginTop: -4 },
   composerInput: { flex: 1, minHeight: 56, maxHeight: 120, borderRadius: 15, backgroundColor: '#F5F3FA', borderWidth: 1, borderColor: '#E5E2EC', paddingHorizontal: 13, paddingTop: 12, paddingBottom: 10, color: '#332D44', fontSize: 15, lineHeight: 21 },
   sendButton: { width: 64, minHeight: 56, alignSelf: 'stretch', borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6656D7' },
   sendButtonDisabled: { backgroundColor: '#D2CDEF' },
