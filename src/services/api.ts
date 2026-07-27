@@ -248,9 +248,10 @@ export function createSession(
     requirePlanApproval?: boolean;
     automationMode?: AutomationMode;
     title?: string;
+    image?: { data: string; mimeType: string };
   } = {},
 ): Promise<Session> {
-  const { requirePlanApproval = true, automationMode, title } = options;
+  const { requirePlanApproval = true, automationMode, title, image } = options;
   return request<Session>('/sessions', apiKey, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -259,6 +260,7 @@ export function createSession(
       requirePlanApproval,
       ...(automationMode ? { automationMode } : {}),
       ...(title ? { title } : {}),
+      ...(image ? { image } : {}),
       sourceContext: {
         source,
         githubRepoContext: { startingBranch },
@@ -271,11 +273,12 @@ export async function sendMessageToJules(
   apiKey: string,
   sessionId: string,
   message: string,
+  image?: { data: string; mimeType: string },
 ): Promise<void> {
   await request<void>(`/sessions/${sessionId}:sendMessage`, apiKey, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: message }),
+    body: JSON.stringify({ prompt: message, ...(image ? { image } : {}) }),
   });
 }
 
