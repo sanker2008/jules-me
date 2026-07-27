@@ -197,8 +197,8 @@ const zhHans = {
   applyUpdate: '重启并应用更新',
   checkAppUpdate: '检查应用更新',
   checkUpdate: '检查更新',
-  releaseNotesTitle: 'v1.0.1 更新内容',
-  releaseNotesText: '新增应用说明、版本与构建信息，以及更新检查入口。',
+  releaseNotesTitle: 'v1.1.0 更新内容',
+  releaseNotesText: '加强了深链、附件和外部链接的安全校验，并提升了界面稳定性。',
   chatAuthError: 'API Key 无效或没有访问权限。请返回设置更新后重试。',
   chatGenericError: '暂时无法与 Jules 同步，请检查网络后重试。',
   unknownTime: '时间未知',
@@ -271,10 +271,16 @@ const zhHans = {
   replyPlaceholder: '补充说明或回复 Jules…',
   sendMessage: '发送消息',
   send: '发送',
+  imageAttachmentMissingData: '所选图片无法读取，请改选其他图片。',
+  imageAttachmentTooLarge: '图片不能超过 5 MB。',
+  imageAttachmentUnsupportedType: '仅支持 GIF、JPEG、PNG 或 WebP 图片。',
+  attachImage: '附加图片',
+  imageSelectionFailed: '图片选择失败，请重试。',
 } satisfies TranslationTable;
 
+type LocaleTranslationTable = Record<keyof typeof zhHans, TranslationValue>;
+
 const zhHant = {
-  ...zhHans,
   justUpdated: '剛剛更新',
   minutesAgo: (minutes: number) => `${minutes} 分鐘前`,
   hoursAgo: (hours: number) => `${hours} 小時前`,
@@ -363,8 +369,8 @@ const zhHant = {
   applyUpdate: '重啟並套用更新',
   checkAppUpdate: '檢查應用更新',
   checkUpdate: '檢查更新',
-  releaseNotesTitle: 'v1.0.1 更新內容',
-  releaseNotesText: '新增應用說明、版本與構建資訊，以及更新檢查入口。',
+  releaseNotesTitle: 'v1.1.0 更新內容',
+  releaseNotesText: '加強深鏈、附件與外部連結的安全檢查，並提升介面穩定性。',
   chatAuthError: 'API Key 無效或沒有存取權限。請返回設定更新後重試。',
   chatGenericError: '暫時無法與 Jules 同步，請檢查網路後重試。',
   unknownTime: '時間未知',
@@ -403,6 +409,11 @@ const zhHant = {
   loadOlderActivities: '載入更早的活動',
   scrollToTop: '快速回到頂部',
   scrollToBottom: '快速跳到底部',
+  viewDiff: '檢視 Diff',
+  view: '檢視',
+  prTitle: 'Jules 建立的 Pull Request',
+  backToHome: '返回 JulesMe 任務頁',
+  openPullRequest: '開啟 Pull Request',
   prDescription: '點擊在 GitHub 中開啟並查看改動。',
   repository: '程式碼庫',
   planReadyBanner: 'Jules 已準備好計畫，確認後才會開始執行。',
@@ -432,7 +443,12 @@ const zhHant = {
   replyPlaceholder: '補充說明或回覆 Jules…',
   sendMessage: '傳送訊息',
   send: '傳送',
-} satisfies TranslationTable;
+  imageAttachmentMissingData: '所選圖片無法讀取，請改選其他圖片。',
+  imageAttachmentTooLarge: '圖片不能超過 5 MB。',
+  imageAttachmentUnsupportedType: '僅支援 GIF、JPEG、PNG 或 WebP 圖片。',
+  attachImage: '附加圖片',
+  imageSelectionFailed: '選擇圖片失敗，請重試。',
+} satisfies LocaleTranslationTable;
 
 const en = {
   justUpdated: 'Just updated',
@@ -523,8 +539,8 @@ const en = {
   applyUpdate: 'Restart and apply update',
   checkAppUpdate: 'Check app updates',
   checkUpdate: 'Check updates',
-  releaseNotesTitle: 'v1.0.1 release notes',
-  releaseNotesText: 'Added app information, version and build details, and an update check entry.',
+  releaseNotesTitle: 'v1.1.0 release notes',
+  releaseNotesText: 'Hardened deep links, attachments, and external links, with interface stability improvements.',
   chatAuthError: 'The API Key is invalid or does not have access. Go back to Settings, update it, and try again.',
   chatGenericError: 'Unable to sync with Jules right now. Check your network and try again.',
   unknownTime: 'Unknown time',
@@ -597,7 +613,12 @@ const en = {
   replyPlaceholder: 'Add context or reply to Jules…',
   sendMessage: 'Send message',
   send: 'Send',
-} satisfies TranslationTable;
+  imageAttachmentMissingData: 'The selected image could not be read. Choose another image.',
+  imageAttachmentTooLarge: 'Images must be 5 MB or smaller.',
+  imageAttachmentUnsupportedType: 'Only GIF, JPEG, PNG, and WebP images are supported.',
+  attachImage: 'Attach image',
+  imageSelectionFailed: 'Unable to select the image. Try again.',
+} satisfies LocaleTranslationTable;
 
 const translations = {
   'zh-Hans': zhHans,

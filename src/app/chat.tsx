@@ -29,6 +29,12 @@ import {
 } from '../services/api';
 import { createTranslator, useAppLanguage } from '../i18n';
 import type { Translator } from '../i18n';
+import {
+  createImageAttachment,
+  getSingleRouteParam,
+  isTrustedPullRequestUrl,
+} from '../utils/jules-guards';
+import type { ImageAttachment, ImageAttachmentResult } from '../utils/jules-guards';
 import { getApiKey } from '../utils/secure-store';
 
 type TimelineKind = 'user' | 'agent' | 'plan' | 'progress' | 'approved' | 'completed' | 'failed' | 'system';
@@ -147,23 +153,43 @@ function activityToTimelineItem(activity: Activity, t: Translator): TimelineItem
   return null;
 }
 
+function getImageAttachmentErrorMessage(
+  error: NonNullable<ImageAttachmentResult['error']>,
+  t: Translator,
+): string {
+  switch (error) {
+    case 'too-large':
+      return t('imageAttachmentTooLarge');
+    case 'unsupported-type':
+      return t('imageAttachmentUnsupportedType');
+    case 'missing-data':
+      return t('imageAttachmentMissingData');
+  }
+}
+
 export default function ChatScreen() {
   const { language } = useAppLanguage();
   const t = useMemo(() => createTranslator(language), [language]);
-  const { sessionId: routeSessionId, sourceId, startingBranch } = useLocalSearchParams<{
-    sessionId?: string;
-    sourceId?: string;
-    startingBranch?: string;
+  const {
+    sessionId: routeSessionId,
+    sourceId: routeSourceId,
+    startingBranch: routeStartingBranch,
+  } = useLocalSearchParams<{
+    sessionId?: string | string[];
+    sourceId?: string | string[];
+    startingBranch?: string | string[];
   }>();
   const router = useRouter();
-  const initialSessionId = Array.isArray(routeSessionId) ? routeSessionId[0] : routeSessionId;
+  const initialSessionId = getSingleRouteParam(routeSessionId);
+  const sourceId = getSingleRouteParam(routeSourceId);
+  const startingBranch = getSingleRouteParam(routeStartingBranch);
 
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [inputText, setInputText] = useState('');
-  const [selectedImage, setSelectedImage] = useState<{ uri: string; base64?: string; mimeType?: string } | null>(null);
+  const [selectedImage, setSelectedImage] = useState<ImageAttachment | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -176,6 +202,7 @@ export default function ChatScreen() {
   const [isTimelineScrollable, setIsTimelineScrollable] = useState(false);
   const [scrollPosition, setScrollPosition] = useState<'top' | 'middle' | 'bottom'>('top');
   const flatListRef = useRef<FlatList<TimelineItem>>(null);
+  const optimisticMessageSequence = useRef(0);
   const timelineContentHeight = useRef(0);
   const timelineViewportHeight = useRef(0);
 
@@ -315,8 +342,8 @@ export default function ChatScreen() {
       return;
     }
 
-    const optimisticId = `local-${Date.now()}`;
-    const imagePayload = selectedImage?.base64 && selectedImage?.mimeType ? { data: selectedImage.base64, mimeType: selectedImage.mimeType } : undefined;
+    const optimisticId = `local-${++optimisticMessageSequence.current}`;
+    const imagePayload = selectedImage ? { data: selectedImage.data, mimeType: selectedImage.mimeType } : undefined;
     let optimisticText = prompt;
     if (selectedImage) {
         optimisticText = optimisticText ? `${optimisticText}\n[Image Attached]` : '[Image Attached]';
@@ -417,14 +444,18 @@ export default function ChatScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage({
-          uri: result.assets[0].uri,
-          base64: result.assets[0].base64 || undefined,
-          mimeType: result.assets[0].mimeType || 'image/jpeg',
-        });
+        const imageAttachment = createImageAttachment(result.assets[0]);
+        if (imageAttachment.error !== undefined) {
+          setSelectedImage(null);
+          setChatError(getImageAttachmentErrorMessage(imageAttachment.error, t));
+          return;
+        }
+
+        setSelectedImage(imageAttachment.attachment);
+        setChatError(null);
       }
     } catch {
-      setChatError('Failed to select image.');
+      setChatError(t('imageSelectionFailed'));
     }
   };
 
@@ -486,6 +517,11 @@ export default function ChatScreen() {
   };
 
   const handleOpenExternalLink = async (url: string) => {
+    if (!isTrustedPullRequestUrl(url)) {
+      setChatError(t('unableOpenLink'));
+      return;
+    }
+
     try {
       await Linking.openURL(url);
     } catch {
@@ -831,7 +867,7 @@ export default function ChatScreen() {
             <View style={styles.composerShell}>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel="Attach Image"
+                accessibilityLabel={t('attachImage')}
                 style={styles.attachButton}
                 onPress={handlePickImage}
                 disabled={isSending}

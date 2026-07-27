@@ -6,6 +6,8 @@
  * callers either receive the server response or a typed request error.
  */
 
+import { encodeJulesResourceId, encodeJulesResourcePath } from '../utils/jules-guards';
+
 const BASE_URL = 'https://jules.googleapis.com/v1alpha';
 
 export class JulesApiError extends Error {
@@ -18,6 +20,21 @@ export class JulesApiError extends Error {
   }
 }
 
+function getResourceId(value: string, label: string): string {
+  try {
+    return encodeJulesResourceId(value);
+  } catch {
+    throw new JulesApiError(`Invalid Jules ${label} identifier.`);
+  }
+}
+
+function getResourcePath(value: string): string {
+  try {
+    return encodeJulesResourcePath(value);
+  } catch {
+    throw new JulesApiError('Invalid Jules resource path.');
+  }
+}
 export interface GitHubBranch {
   displayName: string;
 }
@@ -220,7 +237,7 @@ export async function getSources(apiKey: string, pageToken?: string) {
 }
 
 export function getSource(apiKey: string, sourceName: string): Promise<Source> {
-  return request<Source>(`/${sourceName}`, apiKey);
+  return request<Source>(`/${getResourcePath(sourceName)}`, apiKey);
 }
 
 export async function getSessions(apiKey: string, pageToken?: string) {
@@ -236,7 +253,7 @@ export async function getSessions(apiKey: string, pageToken?: string) {
 }
 
 export function getSession(apiKey: string, sessionId: string): Promise<Session> {
-  return request<Session>(`/sessions/${sessionId}`, apiKey);
+  return request<Session>(`/sessions/${getResourceId(sessionId, 'session')}`, apiKey);
 }
 
 export function createSession(
@@ -275,7 +292,7 @@ export async function sendMessageToJules(
   message: string,
   image?: { data: string; mimeType: string },
 ): Promise<void> {
-  await request<void>(`/sessions/${sessionId}:sendMessage`, apiKey, {
+  await request<void>(`/sessions/${getResourceId(sessionId, 'session')}:sendMessage`, apiKey, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt: message, ...(image ? { image } : {}) }),
@@ -288,7 +305,7 @@ export async function pollActivities(
   pageToken?: string,
 ) {
   const result = await request<PaginatedActivities>(
-    listPath(`/sessions/${sessionId}/activities`, 100, pageToken),
+    listPath(`/sessions/${getResourceId(sessionId, 'session')}/activities`, 100, pageToken),
     apiKey,
   );
 
@@ -303,11 +320,11 @@ export function getActivity(
   sessionId: string,
   activityId: string,
 ): Promise<Activity> {
-  return request<Activity>(`/sessions/${sessionId}/activities/${activityId}`, apiKey);
+  return request<Activity>(`/sessions/${getResourceId(sessionId, 'session')}/activities/${getResourceId(activityId, 'activity')}`, apiKey);
 }
 
 export async function approvePlan(apiKey: string, sessionId: string): Promise<void> {
-  await request<void>(`/sessions/${sessionId}:approvePlan`, apiKey, {
+  await request<void>(`/sessions/${getResourceId(sessionId, 'session')}:approvePlan`, apiKey, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   });

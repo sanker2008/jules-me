@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Updates from 'expo-updates';
 import {
   createSession,
   getSessions,
@@ -26,10 +25,10 @@ import {
 } from '../services/api';
 import { createTranslator, getLanguageName, languageOptions, useAppLanguage } from '../i18n';
 import type { Translator } from '../i18n';
+import { getSingleRouteParam } from '../utils/jules-guards';
 import { getApiKey, saveApiKey } from '../utils/secure-store';
 
 type PickerMode = 'source' | 'branch' | null;
-type UpdateStatus = 'idle' | 'checking' | 'current' | 'ready' | 'unavailable' | 'failed';
 
 function getRelativeTime(dateString: string | undefined, t: Translator): string {
   if (!dateString) return t('justUpdated');
@@ -43,10 +42,6 @@ function getRelativeTime(dateString: string | undefined, t: Translator): string 
   return date.toLocaleDateString();
 }
 
-function getUpdateErrorMessage(error: unknown, t: Translator): string {
-  if (error instanceof Error && error.message) return error.message;
-  return t('updateGenericError');
-}
 
 function getWorkspaceErrorMessage(error: unknown, t: Translator): string {
   if (error instanceof JulesApiError) {
@@ -105,11 +100,18 @@ export default function TaskHomeScreen() {
     t('taskExplainError'),
     t('taskAddTests'),
   ], [t]);
-  const params = useLocalSearchParams<{
-    sourceId?: string;
-    startingBranch?: string;
-    draftPrompt?: string;
+  const {
+    sourceId: routeSourceId,
+    startingBranch: routeStartingBranch,
+    draftPrompt: routeDraftPrompt,
+  } = useLocalSearchParams<{
+    sourceId?: string | string[];
+    startingBranch?: string | string[];
+    draftPrompt?: string | string[];
   }>();
+  const sourceId = getSingleRouteParam(routeSourceId);
+  const startingBranch = getSingleRouteParam(routeStartingBranch);
+  const draftPrompt = getSingleRouteParam(routeDraftPrompt);
   const scrollRef = useRef<ScrollView>(null);
 
   const [savedApiKey, setSavedApiKey] = useState('');
@@ -118,8 +120,6 @@ export default function TaskHomeScreen() {
   const [showAbout, setShowAbout] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
-  const [updateMessage, setUpdateMessage] = useState('');
 
   const [sources, setSources] = useState<Source[]>([]);
   const [sourcesNextPageToken, setSourcesNextPageToken] = useState<string | undefined>();
@@ -206,25 +206,25 @@ export default function TaskHomeScreen() {
   }, [fetchWorkspace]);
 
   useEffect(() => {
-    if (!params.draftPrompt) return;
-    const nextDraftPrompt = params.draftPrompt;
+    if (!draftPrompt) return;
+    const nextDraftPrompt = draftPrompt;
     const timer = setTimeout(() => setTaskPrompt(nextDraftPrompt), 0);
     return () => clearTimeout(timer);
-  }, [params.draftPrompt]);
+  }, [draftPrompt]);
 
   useEffect(() => {
-    if (!params.sourceId || sources.length === 0) return;
-    const source = sources.find(candidate => candidate.name === params.sourceId);
+    if (!sourceId || sources.length === 0) return;
+    const source = sources.find(candidate => candidate.name === sourceId);
     if (!source) return;
 
     const nextSourceName = source.name;
-    const nextBranch = params.startingBranch || source.githubRepo?.defaultBranch?.displayName || null;
+    const nextBranch = startingBranch || source.githubRepo?.defaultBranch?.displayName || null;
     const timer = setTimeout(() => {
       setSelectedSourceName(nextSourceName);
       setSelectedBranch(nextBranch);
     }, 0);
     return () => clearTimeout(timer);
-  }, [params.sourceId, params.startingBranch, sources]);
+  }, [sourceId, startingBranch, sources]);
 
   const refreshWorkspace = () => {
     if (!savedApiKey || isLoadingWorkspace) return;
@@ -296,40 +296,6 @@ export default function TaskHomeScreen() {
     if (!savedApiKey) setShowSettings(true);
   };
 
-  const checkForUpdate = async () => {
-    if (!Updates.isEnabled) {
-      setUpdateStatus('unavailable');
-      setUpdateMessage(t('updateUnavailable'));
-      return;
-    }
-
-    setUpdateStatus('checking');
-    setUpdateMessage(t('updateChecking'));
-    try {
-      const update = await Updates.checkForUpdateAsync();
-      if (!update.isAvailable) {
-        setUpdateStatus('current');
-        setUpdateMessage(t('updateCurrent'));
-        return;
-      }
-
-      await Updates.fetchUpdateAsync();
-      setUpdateStatus('ready');
-      setUpdateMessage(t('updateReady'));
-    } catch (error) {
-      setUpdateStatus('failed');
-      setUpdateMessage(getUpdateErrorMessage(error, t));
-    }
-  };
-
-  const applyUpdate = async () => {
-    try {
-      await Updates.reloadAsync();
-    } catch (error) {
-      setUpdateStatus('failed');
-      setUpdateMessage(getUpdateErrorMessage(error, t));
-    }
-  };
 
   const selectSource = (source: Source) => {
     const defaultBranch = source.githubRepo?.defaultBranch?.displayName;
@@ -773,25 +739,6 @@ export default function TaskHomeScreen() {
               </View>
             </View>
 
-            <View style={styles.updateCard}>
-              <Text style={styles.updateTitle}>{t('appUpdates')}</Text>
-              <Text style={styles.updateDescription}>
-                {updateMessage || t('updateDefaultDescription')}
-              </Text>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={updateStatus === 'ready' ? t('applyUpdate') : t('checkAppUpdate')}
-                disabled={updateStatus === 'checking'}
-                style={[styles.updateButton, updateStatus === 'checking' && styles.iconButtonDisabled]}
-                onPress={updateStatus === 'ready' ? applyUpdate : checkForUpdate}
-              >
-                {updateStatus === 'checking' ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.updateButtonText}>{updateStatus === 'ready' ? t('applyUpdate') : t('checkUpdate')}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
 
             <View style={styles.releaseNotes}>
               <Text style={styles.releaseNotesTitle}>{t('releaseNotesTitle')}</Text>
@@ -920,11 +867,7 @@ const styles = StyleSheet.create({
   aboutInfoRow: { paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#EEEAF6', gap: 4 },
   aboutInfoLabel: { color: '#756F86', fontSize: 12, fontWeight: '700' },
   aboutInfoValue: { color: '#39324E', fontSize: 14, lineHeight: 20, fontWeight: '700' },
-  updateCard: { marginTop: 18, padding: 16, borderRadius: 16, backgroundColor: '#F3F1FF', borderWidth: 1, borderColor: '#DDD8FB' },
-  updateTitle: { color: '#3F347B', fontSize: 15, fontWeight: '800' },
-  updateDescription: { color: '#625B7B', fontSize: 13, lineHeight: 19, marginTop: 5 },
-  updateButton: { minHeight: 44, marginTop: 13, borderRadius: 11, backgroundColor: '#6656D7', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  updateButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+
   releaseNotes: { marginTop: 16 },
   releaseNotesTitle: { color: '#4D465E', fontSize: 13, fontWeight: '800' },
   releaseNotesText: { color: '#756F86', fontSize: 13, lineHeight: 19, marginTop: 4 },
