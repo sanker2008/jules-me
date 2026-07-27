@@ -1,8 +1,10 @@
 # JulesMe
 
-JulesMe 是一个以手机端交互为主的 Expo / React Native 应用，用于通过 [Jules REST API](https://developers.google.com/jules/api/reference/rest) 发起、跟进和回顾代码任务。
+JulesMe 是由 sanOmni 开发、以手机端交互为主的 Expo / React Native 应用。它是 [Google Jules REST API](https://developers.google.com/jules/api/reference/rest) 的客户端，用于发起、跟进和回顾代码任务。
 
-它不是 Jules Web 的布局复刻：移动端将流程收敛为「选择代码库与分支 → 描述任务 → 审阅计划 → 跟进执行结果」，方便在手机上快速处理代码协作。
+> **产品定位**：JulesMe 只提供移动端交互和本地 API Key 保存，不是独立实现或自行运行的代码代理服务。代码任务的执行、计划、会话、产物和 Pull Request 能力均由 Google 的 Jules 产品及其 API 提供，并受其 API 可用性、权限与限制约束。
+
+它不是 Jules Web 的布局复刻：移动端将流程收敛为「选择代码库与分支 → 描述任务 → 审阅计划 → 跟进执行结果」，方便在手机上使用 Google Jules 处理代码协作。
 
 ## 主要能力
 
@@ -31,9 +33,9 @@ JulesMe 是一个以手机端交互为主的 Expo / React Native 应用，用于
 
 > Jules 创建会话必须提供任务描述、`sources/{source}` 格式的代码库和 GitHub 起始分支。因此 JulesMe 不提供“无代码库任务”入口。
 
-## Jules API 映射与边界
+## Google Jules API 映射与边界
 
-| JulesMe 交互 | Jules REST API |
+| JulesMe 交互 | Google Jules REST API |
 | --- | --- |
 | 选择代码库和分支 | `sources.list`，使用代码库返回的 `defaultBranch` / `branches` |
 | 创建任务 | `sessions.create`，传入 `prompt`、`sourceContext`、计划确认与 PR 自动化选项 |
