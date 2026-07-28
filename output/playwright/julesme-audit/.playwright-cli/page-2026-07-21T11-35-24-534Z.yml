@@ -1,0 +1,22 @@
+- generic [ref=f2e4]:
+  - generic [ref=f2e8]:
+    - generic [ref=f2e9]:
+      - generic [ref=f2e10]: Jules Workspace
+      - generic [ref=f2e11]:
+        - generic [ref=f2e12] [cursor=pointer]: ➕
+        - generic [ref=f2e14] [cursor=pointer]: 🔄
+        - generic [ref=f2e16] [cursor=pointer]: ⚙️
+    - generic [ref=f2e19]:
+      - generic [ref=f2e20]: Your Codebases
+      - generic [ref=f2e21] [cursor=pointer]:
+        - generic [ref=f2e22]: demo-repo
+        - generic [ref=f2e23]: codingants/demo-repo
+      - generic [ref=f2e24]: Recent Sessions
+      - generic [ref=f2e25] [cursor=pointer]:
+        - generic [ref=f2e26]: Fix checkout validation
+        - generic [ref=f2e27]: "Repo: demo-repo"
+        - generic [ref=f2e28]: "1h ago • COMPLETED • ID: session-completed"
+  - generic [ref=f2e30]:
+    - generic [ref=f2e31]: Jules Workspace
+    - link "Home" [ref=f2e32] [cursor=pointer]:
+      - /url: /

@@ -1,0 +1,44 @@
+- generic [ref=e25]:
+  - generic [ref=e26]:
+    - generic [ref=e27]:
+      - generic [ref=e28]: JulesMe
+      - generic [ref=e29]: Live Jules API · synced 2:59:53 PM
+    - generic [ref=e30]:
+      - button "Refresh JulesMe" [ref=e31] [cursor=pointer]:
+        - generic [ref=e32]: ↻
+      - button "Open API key settings" [ref=e33] [cursor=pointer]:
+        - generic [ref=e34]: ⚙
+  - generic [ref=e37]:
+    - generic [ref=e38]: Recent Sessions
+    - generic [ref=e39] [cursor=pointer]:
+      - generic [ref=e40]: App功能与界面全面优化建议
+      - generic [ref=e41]: "Repo: DOKODEMO"
+      - generic [ref=e42]: "7/20/2026, 10:00:32 AM • COMPLETED • ID: 12342215279025815973"
+    - generic [ref=e43] [cursor=pointer]:
+      - generic [ref=e44]: Review
+      - generic [ref=e45]: "Repo: san-ghost-theme"
+      - generic [ref=e46]: "7/19/2026, 10:07:23 PM • COMPLETED • ID: 16627507693547119928"
+    - generic [ref=e47] [cursor=pointer]:
+      - generic [ref=e48]: 项目评审
+      - generic [ref=e49]: "Repo: jules-me"
+      - generic [ref=e50]: "7/17/2026, 7:15:03 PM • COMPLETED • ID: 421506930928153120"
+    - generic [ref=e51] [cursor=pointer]:
+      - generic [ref=e52]: 分析整个项目，有什么是你可以做的，你可以从零设计一个完整的搜狗输入法皮肤吗
+      - generic [ref=e53]: "Repo: SougouSkin"
+      - generic [ref=e54]: "7/17/2026, 10:11:15 AM • COMPLETED • ID: 15533782475320436369"
+    - generic [ref=e55] [cursor=pointer]:
+      - generic [ref=e56]: 基于 Edger 的商用 Ghost 主题开发与优化
+      - generic [ref=e57]: "7/16/2026, 3:32:57 PM • COMPLETED • ID: 10748821282639817041"
+    - generic [ref=e58]: Your Codebases
+    - generic [ref=e59] [cursor=pointer]:
+      - generic [ref=e60]: sanker2008/DOKODEMO
+      - generic [ref=e61]: Start from main
+    - generic [ref=e62] [cursor=pointer]:
+      - generic [ref=e63]: sanker2008/SougouSkin
+      - generic [ref=e64]: Start from main
+    - generic [ref=e65] [cursor=pointer]:
+      - generic [ref=e66]: sanker2008/jules-me
+      - generic [ref=e67]: Start from main
+    - generic [ref=e68] [cursor=pointer]:
+      - generic [ref=e69]: sanker2008/san-ghost-theme
+      - generic [ref=e70]: Start from main

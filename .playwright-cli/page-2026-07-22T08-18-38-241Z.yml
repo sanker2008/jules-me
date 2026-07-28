@@ -1,0 +1,14 @@
+- generic [ref=e9]:
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - generic [ref=e12]: JulesMe
+      - generic [ref=e13]: 你的代码任务工作台
+    - generic [ref=e14]:
+      - button "刷新工作区" [disabled]:
+        - generic [ref=e15]: ↻
+      - button "打开设置" [ref=e16] [cursor=pointer]:
+        - generic [ref=e17]: ⚙
+  - generic [ref=e18]:
+    - generic [ref=e19]: 连接 Jules
+    - generic [ref=e20]: 保存 API Key 后即可查看代码库并开始任务。
+    - generic [ref=e21] [cursor=pointer]: 配置 API Key
