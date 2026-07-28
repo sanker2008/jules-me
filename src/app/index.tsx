@@ -4,7 +4,6 @@ import {
   Modal,
   Platform,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   createSession,
   getSessions,
@@ -377,7 +377,7 @@ export default function TaskHomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safeArea}>
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <View>
@@ -561,7 +561,7 @@ export default function TaskHomeScreen() {
       </View>
 
       <Modal visible={pickerMode !== null} animationType="slide" transparent onRequestClose={() => setPickerMode(null)}>
-        <View style={styles.sheetOverlay}>
+        <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.sheetOverlay}>
           <TouchableOpacity style={styles.sheetDismiss} activeOpacity={1} onPress={() => setPickerMode(null)} />
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
@@ -610,11 +610,11 @@ export default function TaskHomeScreen() {
               ) : null}
             </ScrollView>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       <Modal visible={showSettings} animationType="fade" transparent onRequestClose={() => setShowSettings(false)}>
-        <View style={styles.settingsOverlay}>
+        <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.settingsOverlay}>
           <View style={styles.settingsCard}>
             <View style={styles.settingsHeader}>
               <Text style={styles.settingsTitle}>{t('connectJules')}</Text>
@@ -704,11 +704,11 @@ export default function TaskHomeScreen() {
               <Text style={styles.aboutEntryArrow}>›</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       <Modal visible={showAbout} animationType="fade" transparent onRequestClose={closeAbout}>
-        <View style={styles.settingsOverlay}>
+        <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.settingsOverlay}>
           <View style={[styles.settingsCard, styles.aboutCard]}>
             <View style={styles.aboutHeader}>
               <View>
@@ -745,7 +745,7 @@ export default function TaskHomeScreen() {
               <Text style={styles.releaseNotesText}>{t('releaseNotesText')}</Text>
             </View>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );

@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Linking,
   Platform,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +15,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Activity,
   approvePlan,
@@ -702,7 +702,7 @@ export default function ChatScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safeArea}>
       <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('backToHome')} onPress={() => router.back()} style={styles.backButton}>
