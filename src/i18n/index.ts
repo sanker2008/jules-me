@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Localization from 'expo-localization';
 import * as SecureStore from 'expo-secure-store';
+import type { ThemePreference } from '../theme';
+
 
 export type AppLanguage = 'zh-Hans' | 'zh-Hant' | 'en';
 export type LanguagePreference = 'system' | AppLanguage;
+
 
 const LANGUAGE_KEY = 'JULESME_LANGUAGE';
 
@@ -19,6 +22,19 @@ export const languageOptions: LanguagePreference[] = ['system', 'zh-Hans', 'zh-H
 
 export function getLanguageName(language: LanguagePreference) {
   return languageNames[language];
+}
+
+export function getThemeName(theme: ThemePreference, t: Translator): string {
+  switch (theme) {
+    case 'system':
+      return t('themeSystem');
+    case 'light':
+      return t('themeLight');
+    case 'dark':
+      return t('themeDark');
+    default:
+      return t('themeSystem');
+  }
 }
 
 function normalizeLanguage(value: string | null | undefined): LanguagePreference {
@@ -146,6 +162,7 @@ const zhHans = {
   connectJules: '连接 Jules',
   apiKeyStartHint: '保存 API Key 后即可查看代码库并开始任务。',
   configureApiKey: '配置 API Key',
+  clearForm: '清空表单',
   newTask: '新任务',
   heroTitle: '你想让 Jules 做什么？',
   heroDescription: '选择仓库和分支，再清楚描述你的目标。',
@@ -182,6 +199,11 @@ const zhHans = {
   saveAndConnect: '保存并连接',
   language: '语言',
   languageDescription: '应用界面语言；聊天内容保持原文。',
+  theme: '外观主题',
+  themeDescription: '界面色彩主题模式。',
+  themeSystem: '跟随系统',
+  themeLight: '浅色模式',
+  themeDark: '深色模式',
   aboutJulesMe: '关于 JulesMe',
   openAboutJulesMe: '打开关于 JulesMe',
   aboutDescription: '版本信息、隐私说明与应用更新',
@@ -197,8 +219,8 @@ const zhHans = {
   applyUpdate: '重启并应用更新',
   checkAppUpdate: '检查应用更新',
   checkUpdate: '检查更新',
-  releaseNotesTitle: 'v1.1.0 更新内容',
-  releaseNotesText: '加强了深链、附件和外部链接的安全校验，并提升了界面稳定性。',
+  releaseNotesTitle: 'v1.1.3 更新内容',
+  releaseNotesText: '新增 Light/Dark 外观主题切换、可折叠任务表单及表单清空功能。',
   chatAuthError: 'API Key 无效或没有访问权限。请返回设置更新后重试。',
   chatGenericError: '暂时无法与 Jules 同步，请检查网络后重试。',
   unknownTime: '时间未知',
@@ -318,6 +340,7 @@ const zhHant = {
   connectJules: '連接 Jules',
   apiKeyStartHint: '儲存 API Key 後即可查看程式碼庫並開始任務。',
   configureApiKey: '設定 API Key',
+  clearForm: '清空表單',
   newTask: '新任務',
   heroTitle: '你想讓 Jules 做什麼？',
   heroDescription: '選擇倉庫和分支，再清楚描述你的目標。',
@@ -354,6 +377,11 @@ const zhHant = {
   saveAndConnect: '儲存並連接',
   language: '語言',
   languageDescription: '應用介面語言；聊天內容保持原文。',
+  theme: '外觀主題',
+  themeDescription: '介面色彩主題模式。',
+  themeSystem: '跟隨系統',
+  themeLight: '淺色模式',
+  themeDark: '深色模式',
   aboutJulesMe: '關於 JulesMe',
   openAboutJulesMe: '開啟關於 JulesMe',
   aboutDescription: '版本資訊、隱私說明與應用更新',
@@ -369,8 +397,8 @@ const zhHant = {
   applyUpdate: '重啟並套用更新',
   checkAppUpdate: '檢查應用更新',
   checkUpdate: '檢查更新',
-  releaseNotesTitle: 'v1.1.0 更新內容',
-  releaseNotesText: '加強深鏈、附件與外部連結的安全檢查，並提升介面穩定性。',
+  releaseNotesTitle: 'v1.1.3 更新內容',
+  releaseNotesText: '新增 Light/Dark 外觀主題切換、可折疊任務表單及表單清空功能。',
   chatAuthError: 'API Key 無效或沒有存取權限。請返回設定更新後重試。',
   chatGenericError: '暫時無法與 Jules 同步，請檢查網路後重試。',
   unknownTime: '時間未知',
@@ -458,7 +486,7 @@ const en = {
   updateGenericError: 'Unable to check for updates right now. Try again later.',
   workspaceAuthError: 'The API Key is invalid or does not have access. Update it in Settings and try again.',
   workspaceGenericError: 'Unable to load your Jules workspace right now. Try again later.',
-  chooseRepository: 'Choose repository',
+  chooseRepository: 'Choose repo',
   chooseBranch: 'Choose branch',
   sessionAwaitingPlan: 'Waiting for plan approval',
   sessionAwaitingFeedback: 'Waiting for your feedback',
@@ -476,7 +504,7 @@ const en = {
   updateChecking: 'Checking for updates…',
   updateCurrent: 'You are on the latest version.',
   updateReady: 'Update downloaded. Restart the app to apply it.',
-  selectBranchRequired: 'Choose a repository with an available branch first.',
+  selectBranchRequired: 'Choose a repo with an available branch first.',
   missingSessionId: 'Jules did not return a session ID after creating the session.',
   openSession: (title: string) => `Open session: ${title}`,
   untitledTask: 'Untitled task',
@@ -486,11 +514,12 @@ const en = {
   openSettings: 'Open settings',
   syncingWorkspace: 'Syncing your Jules workspace…',
   connectJules: 'Connect Jules',
-  apiKeyStartHint: 'Save your API Key to view repositories and start tasks.',
+  apiKeyStartHint: 'Save your API Key to view repos and start tasks.',
   configureApiKey: 'Configure API Key',
+  clearForm: 'Clear form',
   newTask: 'New task',
   heroTitle: 'What should Jules do?',
-  heroDescription: 'Choose a repository and branch, then describe the goal clearly.',
+  heroDescription: 'Choose a repo and branch, then describe the goal clearly.',
   chooseStartingBranch: 'Choose starting branch',
   taskDescription: 'Task description',
   taskPlaceholder: 'Example: find why checkout validation fails and propose a fix',
@@ -509,12 +538,12 @@ const en = {
   recentSessions: 'Recent sessions',
   noRecentSessions: 'Completed and failed sessions will appear here.',
   loadMoreSessions: 'Load more sessions',
-  sourceSheetDescription: 'Each task needs a GitHub repository connected to Jules.',
-  privateRepository: 'Private repository',
-  githubRepository: 'GitHub repository',
+  sourceSheetDescription: 'Each task needs a GitHub repo connected to Jules.',
+  privateRepository: 'Private repo',
+  githubRepository: 'GitHub repo',
   noDefaultBranch: 'No default branch',
-  noBranches: 'This repository did not return available branches. Choose another repository.',
-  loadMoreRepositories: 'Load more repositories',
+  noBranches: 'This repo did not return available branches. Choose another repo.',
+  loadMoreRepositories: 'Load more repos',
   settingsDescriptionWeb: 'On web, your API Key is stored in this browser’s local storage.',
   settingsDescriptionNative: 'Your API Key is stored only in secure storage on this device.',
   pasteApiKey: 'Paste API Key',
@@ -524,6 +553,11 @@ const en = {
   saveAndConnect: 'Save and connect',
   language: 'Language',
   languageDescription: 'App interface language. Chat content stays unchanged.',
+  theme: 'Theme',
+  themeDescription: 'App color theme preference.',
+  themeSystem: 'System',
+  themeLight: 'Light',
+  themeDark: 'Dark',
   aboutJulesMe: 'About JulesMe',
   openAboutJulesMe: 'Open About JulesMe',
   aboutDescription: 'Version, privacy, and app updates',
@@ -539,8 +573,8 @@ const en = {
   applyUpdate: 'Restart and apply update',
   checkAppUpdate: 'Check app updates',
   checkUpdate: 'Check updates',
-  releaseNotesTitle: 'v1.1.0 release notes',
-  releaseNotesText: 'Hardened deep links, attachments, and external links, with interface stability improvements.',
+  releaseNotesTitle: 'v1.1.3 release notes',
+  releaseNotesText: 'Added Light/Dark theme toggle, collapsible task form, and form clear button.',
   chatAuthError: 'The API Key is invalid or does not have access. Go back to Settings, update it, and try again.',
   chatGenericError: 'Unable to sync with Jules right now. Check your network and try again.',
   unknownTime: 'Unknown time',
@@ -548,7 +582,7 @@ const en = {
   dateThisYear: (month: number, day: number, time: string) => `${month}/${day} ${time}`,
   fullDate: (year: number, month: number, day: number, time: string) => `${year}/${month}/${day} ${time}`,
   noApiKeySaved: 'Save a Jules API Key in Settings first.',
-  chooseSourceBranchBeforeStart: 'Choose a repository and branch on the task page before starting.',
+  chooseSourceBranchBeforeStart: 'Choose a repo and branch on the task page before starting.',
   unableOpenLink: 'Unable to open the link right now. Try again later.',
   codeChanges: 'Code changes',
   collapse: 'Collapse',
@@ -584,14 +618,14 @@ const en = {
   prTitle: 'Pull Request created by Jules',
   prDescription: 'Open it in GitHub to review the changes.',
   backToHome: 'Back to JulesMe task page',
-  repository: 'Repository',
+  repository: 'Repo',
   planReadyBanner: 'Jules has a plan ready. It will start only after you approve it.',
   feedbackBanner: 'Jules is waiting for more information from you.',
   taskGoal: 'Task goal',
   deliveryResult: 'Delivery result',
   prCreatedDelivery: 'Jules created a Pull Request. Review the changes before deciding what to do next.',
   completedDelivery: 'Jules ended this task. Review the activity log below to confirm the delivery.',
-  failedDelivery: 'Jules did not complete this task. You can start again with the same repository and branch.',
+  failedDelivery: 'Jules did not complete this task. You can start again with the same repo and branch.',
   activityCount: (count: number) => `${count} activities`,
   changesCount: (count: number) => `${count} code changes`,
   commandSuccessCount: (success: number, total: number) => `${success}/${total} commands succeeded`,
@@ -604,8 +638,8 @@ const en = {
   selectedBranch: 'selected branch',
   julesWorking: 'Jules is working. Activity syncs automatically.',
   sessionEnded: 'Session ended',
-  continueSameRepository: 'You can continue follow-up work in the same repository.',
-  retrySameRepository: 'Start again with the same repository and branch.',
+  continueSameRepository: 'You can continue follow-up work in the same repo.',
+  retrySameRepository: 'Start again with the same repo and branch.',
   startFollowUp: 'Start follow-up task',
   restartTask: 'Start again',
   sendMessageToJules: 'Send message to Jules',

@@ -23,8 +23,9 @@ import {
   Session,
   Source,
 } from '../services/api';
-import { createTranslator, getLanguageName, languageOptions, useAppLanguage } from '../i18n';
+import { createTranslator, getLanguageName, getThemeName, languageOptions, useAppLanguage } from '../i18n';
 import type { Translator } from '../i18n';
+import { themeOptions, useAppTheme } from '../theme';
 import { getSingleRouteParam } from '../utils/jules-guards';
 import { getApiKey, saveApiKey } from '../utils/secure-store';
 
@@ -94,6 +95,7 @@ function isActive(session: Session) {
 export default function TaskHomeScreen() {
   const router = useRouter();
   const { preference: languagePreference, setPreference: setLanguagePreference, language } = useAppLanguage();
+  const { preference: themePreference, setPreference: setThemePreference } = useAppTheme();
   const t = useMemo(() => createTranslator(language), [language]);
   const taskTemplates = useMemo(() => [
     t('taskFixBug'),
@@ -119,6 +121,8 @@ export default function TaskHomeScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [isFormExpanded, setIsFormExpanded] = useState(true);
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
 
   const [sources, setSources] = useState<Source[]>([]);
@@ -372,9 +376,20 @@ export default function TaskHomeScreen() {
     );
   };
 
+  const isFormDirty = Boolean(taskPrompt || selectedSourceName || selectedBranch);
+
+  const handleClearForm = useCallback(() => {
+    setTaskPrompt('');
+    setSelectedSourceName(null);
+    setSelectedBranch(null);
+    setRequirePlanApproval(true);
+    setAutoCreatePr(false);
+  }, []);
+
   const canStartTask = Boolean(
     taskPrompt.trim() && selectedSource && selectedBranch && savedApiKey && !isStartingSession,
   );
+
 
   return (
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safeArea}>
@@ -394,7 +409,7 @@ export default function TaskHomeScreen() {
               onPress={refreshWorkspace}
               style={[styles.iconButton, (!savedApiKey || isLoadingWorkspace) && styles.iconButtonDisabled]}
             >
-              <Text style={styles.iconButtonText}>↻</Text>
+              <Text style={[styles.iconButtonText, styles.refreshIconText]}>↻</Text>
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
@@ -429,91 +444,126 @@ export default function TaskHomeScreen() {
             refreshControl={<RefreshControl refreshing={isLoadingWorkspace} onRefresh={refreshWorkspace} tintColor="#6D5CE7" />}
           >
             <View style={styles.hero}>
-              <Text style={styles.eyebrow}>{t('newTask')}</Text>
-              <Text style={styles.heroTitle}>{t('heroTitle')}</Text>
-              <Text style={styles.heroDescription}>{t('heroDescription')}</Text>
-
-              <View style={styles.contextRow}>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={t('chooseRepository')}
-                  style={styles.contextChip}
-                  onPress={() => setPickerMode('source')}
-                >
-                  <Text style={styles.contextChipLabel}>⌘ {getSourceLabel(selectedSource, t)}</Text>
-                  <View style={styles.contextChipArrowContainer}>
-                    <Text style={styles.contextChipArrow}>⌄</Text>
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={t('chooseStartingBranch')}
-                  style={[styles.contextChip, !selectedSource && styles.contextChipDisabled]}
-                  disabled={!selectedSource}
-                  onPress={() => setPickerMode('branch')}
-                >
-                  <Text style={styles.contextChipLabel}>⑂ {selectedBranch || t('chooseBranch')}</Text>
-                  <View style={styles.contextChipArrowContainer}>
-                    <Text style={styles.contextChipArrow}>⌄</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.composer}>
-                <TextInput
-                  accessibilityLabel={t('taskDescription')}
-                  style={styles.taskInput}
-                  value={taskPrompt}
-                  onChangeText={setTaskPrompt}
-                  placeholder={t('taskPlaceholder')}
-                  placeholderTextColor="#98A2B3"
-                  multiline
-                  textAlignVertical="top"
-                  maxLength={2000}
-                />
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={t('startTask')}
-                  disabled={!canStartTask}
-                  onPress={handleStartTask}
-                  style={[styles.startButton, !canStartTask && styles.startButtonDisabled]}
-                >
-                  {isStartingSession ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.startButtonText}>{t('startTaskButton')}</Text>}
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateRow}>
-                {taskTemplates.map(template => (
-                  <TouchableOpacity key={template} style={styles.templateChip} onPress={() => setTaskPrompt(template)}>
-                    <Text style={styles.templateText}>{template}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <View style={styles.optionRow}>
-                <View style={styles.optionCopy}>
-                  <Text style={styles.optionTitle}>{t('requirePlanTitle')}</Text>
-                  <Text style={styles.optionDescription}>{t('requirePlanDescription')}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('newTask')}
+                accessibilityState={{ expanded: isFormExpanded }}
+                style={styles.heroHeader}
+                onPress={() => setIsFormExpanded(prev => !prev)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.heroHeaderCopy}>
+                  <Text style={styles.eyebrow}>{t('newTask')}</Text>
+                  <Text style={styles.heroHeaderTitle} numberOfLines={1}>
+                    {isFormExpanded
+                      ? t('heroTitle')
+                      : (selectedSource ? `${getSourceLabel(selectedSource, t)}${selectedBranch ? ` · ${selectedBranch}` : ''}` : t('heroTitle'))}
+                  </Text>
                 </View>
-                <Switch
-                  value={requirePlanApproval}
-                  onValueChange={setRequirePlanApproval}
-                  trackColor={{ false: '#D0D5DD', true: '#B6AEF5' }}
-                  thumbColor={requirePlanApproval ? '#6D5CE7' : '#FFFFFF'}
-                />
-              </View>
-              <View style={styles.optionRow}>
-                <View style={styles.optionCopy}>
-                  <Text style={styles.optionTitle}>{t('autoPrTitle')}</Text>
-                  <Text style={styles.optionDescription}>{t('autoPrDescription')}</Text>
+                <View style={styles.heroToggleCircle}>
+                  <Text style={styles.heroToggleArrow}>{isFormExpanded ? '⌃' : '⌄'}</Text>
                 </View>
-                <Switch
-                  value={autoCreatePr}
-                  onValueChange={setAutoCreatePr}
-                  trackColor={{ false: '#D0D5DD', true: '#B6AEF5' }}
-                  thumbColor={autoCreatePr ? '#6D5CE7' : '#FFFFFF'}
-                />
-              </View>
+              </TouchableOpacity>
+
+              {isFormExpanded ? (
+                <View style={styles.heroBody}>
+                  <Text style={styles.heroDescription}>{t('heroDescription')}</Text>
+
+                  <View style={styles.contextRow}>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={t('chooseRepository')}
+                      style={styles.contextChip}
+                      onPress={() => setPickerMode('source')}
+                    >
+                      <Text style={styles.contextChipLabel}>⌘ {getSourceLabel(selectedSource, t)}</Text>
+                      <View style={styles.contextChipArrowContainer}>
+                        <Text style={styles.contextChipArrow}>⌄</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={t('chooseStartingBranch')}
+                      style={[styles.contextChip, !selectedSource && styles.contextChipDisabled]}
+                      disabled={!selectedSource}
+                      onPress={() => setPickerMode('branch')}
+                    >
+                      <Text style={styles.contextChipLabel}>⑂ {selectedBranch || t('chooseBranch')}</Text>
+                      <View style={styles.contextChipArrowContainer}>
+                        <Text style={styles.contextChipArrow}>⌄</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.composer}>
+                    <TextInput
+                      accessibilityLabel={t('taskDescription')}
+                      style={styles.taskInput}
+                      value={taskPrompt}
+                      onChangeText={setTaskPrompt}
+                      placeholder={t('taskPlaceholder')}
+                      placeholderTextColor="#98A2B3"
+                      multiline
+                      textAlignVertical="top"
+                      maxLength={2000}
+                    />
+                    <View style={styles.composerFooter}>
+                      {isFormDirty ? (
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel={t('clearForm')}
+                          onPress={handleClearForm}
+                          style={styles.clearFormButton}
+                        >
+                          <Text style={styles.clearFormButtonText}>{t('clearForm')}</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={t('startTask')}
+                        disabled={!canStartTask}
+                        onPress={handleStartTask}
+                        style={[styles.startButton, !canStartTask && styles.startButtonDisabled, isFormDirty && styles.startButtonFlexible]}
+                      >
+                        {isStartingSession ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.startButtonText}>{t('startTaskButton')}</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateRow}>
+                    {taskTemplates.map(template => (
+                      <TouchableOpacity key={template} style={styles.templateChip} onPress={() => setTaskPrompt(template)}>
+                        <Text style={styles.templateText}>{template}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  <View style={styles.optionRow}>
+                    <View style={styles.optionCopy}>
+                      <Text style={styles.optionTitle}>{t('requirePlanTitle')}</Text>
+                      <Text style={styles.optionDescription}>{t('requirePlanDescription')}</Text>
+                    </View>
+                    <Switch
+                      value={requirePlanApproval}
+                      onValueChange={setRequirePlanApproval}
+                      trackColor={{ false: '#D0D5DD', true: '#B6AEF5' }}
+                      thumbColor={requirePlanApproval ? '#6D5CE7' : '#FFFFFF'}
+                    />
+                  </View>
+                  <View style={styles.optionRow}>
+                    <View style={styles.optionCopy}>
+                      <Text style={styles.optionTitle}>{t('autoPrTitle')}</Text>
+                      <Text style={styles.optionDescription}>{t('autoPrDescription')}</Text>
+                    </View>
+                    <Switch
+                      value={autoCreatePr}
+                      onValueChange={setAutoCreatePr}
+                      trackColor={{ false: '#D0D5DD', true: '#B6AEF5' }}
+                      thumbColor={autoCreatePr ? '#6D5CE7' : '#FFFFFF'}
+                    />
+                  </View>
+                </View>
+              ) : null}
             </View>
 
             {workspaceError ? (
@@ -657,6 +707,41 @@ export default function TaskHomeScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.languageSection}>
+              <Text style={styles.settingsLabel}>{t('theme')}</Text>
+              <Text style={styles.languageDescription}>{t('themeDescription')}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('theme')}
+                accessibilityState={{ expanded: showThemeMenu }}
+                style={[styles.languageSelect, showThemeMenu && styles.languageSelectOpen]}
+                onPress={() => setShowThemeMenu(current => !current)}
+              >
+                <Text style={styles.languageSelectText}>{getThemeName(themePreference, t)}</Text>
+                <Text style={styles.languageSelectArrow}>{showThemeMenu ? '⌃' : '⌄'}</Text>
+              </TouchableOpacity>
+              {showThemeMenu ? (
+                <View style={styles.languageMenu}>
+                  {themeOptions.map(option => (
+                    <TouchableOpacity
+                      key={option}
+                      accessibilityRole="menuitem"
+                      accessibilityState={{ selected: themePreference === option }}
+                      style={[styles.languageMenuItem, themePreference === option && styles.languageMenuItemSelected]}
+                      onPress={() => {
+                        setShowThemeMenu(false);
+                        void setThemePreference(option);
+                      }}
+                    >
+                      <Text style={[styles.languageMenuItemText, themePreference === option && styles.languageMenuItemTextSelected]}>
+                        {getThemeName(option, t)}
+                      </Text>
+                      {themePreference === option ? <Text style={styles.languageMenuCheck}>✓</Text> : null}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+            <View style={styles.languageSection}>
               <Text style={styles.settingsLabel}>{t('language')}</Text>
               <Text style={styles.languageDescription}>{t('languageDescription')}</Text>
               <TouchableOpacity
@@ -691,6 +776,7 @@ export default function TaskHomeScreen() {
                 </View>
               ) : null}
             </View>
+
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={t('openAboutJulesMe')}
@@ -760,15 +846,23 @@ const styles = StyleSheet.create({
   topActions: { flexDirection: 'row', gap: 4 },
   iconButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4F2FF' },
   iconButtonDisabled: { opacity: 0.45 },
-  iconButtonText: { color: '#5B4BC4', fontSize: 22, lineHeight: 25, fontWeight: '600' },
+  iconButtonText: { color: '#5B4BC4', fontSize: 20, lineHeight: 20, fontWeight: '600', textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false },
+  refreshIconText: { marginTop: -2 },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40, gap: 24 },
   initialLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 38, gap: 12 },
   initialLoadingTitle: { color: '#2B2548', fontSize: 22, fontWeight: '800' },
   initialLoadingText: { color: '#726D86', fontSize: 14, lineHeight: 21, textAlign: 'center' },
   hero: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#E8E5FA', shadowColor: '#59489D', shadowOpacity: 0.06, shadowOffset: { width: 0, height: 8 }, shadowRadius: 20, elevation: 2 },
+  heroHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  heroHeaderCopy: { flex: 1 },
+  heroHeaderTitle: { color: '#25213D', fontSize: 20, lineHeight: 26, fontWeight: '800', marginTop: 3, letterSpacing: -0.3 },
+  heroToggleCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F4F2FF', alignItems: 'center', justifyContent: 'center' },
+  heroToggleArrow: { color: '#6656D7', fontSize: 18, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
+  heroBody: { marginTop: 10 },
   eyebrow: { color: '#6D5CE7', fontSize: 13, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
   heroTitle: { color: '#25213D', fontSize: 24, lineHeight: 31, fontWeight: '800', marginTop: 5, letterSpacing: -0.4 },
+
   heroDescription: { color: '#77718B', fontSize: 14, lineHeight: 21, marginTop: 5 },
   contextRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 },
   contextChip: { minHeight: 40, maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, paddingHorizontal: 12, backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: '#E3DFFF' },
@@ -778,7 +872,11 @@ const styles = StyleSheet.create({
   contextChipArrow: { color: '#7668C8', fontSize: 16, lineHeight: 16, textAlign: 'center', includeFontPadding: false },
   composer: { marginTop: 14, borderWidth: 1, borderColor: '#DCD6FA', borderRadius: 18, padding: 12, backgroundColor: '#FCFBFF' },
   taskInput: { minHeight: 116, color: '#27213E', fontSize: 16, lineHeight: 23, paddingHorizontal: 4, paddingTop: 4, paddingBottom: 12 },
+  composerFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
+  clearFormButton: { minHeight: 48, borderRadius: 13, backgroundColor: '#F2F0FB', borderWidth: 1, borderColor: '#E2DEF7', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  clearFormButtonText: { color: '#6656D7', fontSize: 14, fontWeight: '700' },
   startButton: { minHeight: 48, borderRadius: 13, backgroundColor: '#6656D7', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  startButtonFlexible: { flex: 1 },
   startButtonDisabled: { backgroundColor: '#CFC9F1' },
   startButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   templateRow: { gap: 8, paddingTop: 12, paddingBottom: 2 },
