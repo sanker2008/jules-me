@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,8 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Constants from 'expo-constants';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   createSession,
@@ -23,11 +22,11 @@ import {
   Session,
   Source,
 } from '../services/api';
-import { createTranslator, getLanguageName, getThemeName, languageOptions, useAppLanguage } from '../i18n';
+import { createTranslator, useAppLanguage } from '../i18n';
 import type { Translator } from '../i18n';
-import { themeOptions, useAppTheme } from '../theme';
+import { useTheme } from '../hooks/use-theme';
 import { getSingleRouteParam } from '../utils/jules-guards';
-import { getApiKey, saveApiKey } from '../utils/secure-store';
+import { getApiKey } from '../utils/secure-store';
 
 type PickerMode = 'source' | 'branch' | null;
 
@@ -42,7 +41,6 @@ function getRelativeTime(dateString: string | undefined, t: Translator): string 
   if (seconds < 60 * 60 * 48) return t('yesterday');
   return date.toLocaleDateString();
 }
-
 
 function getWorkspaceErrorMessage(error: unknown, t: Translator): string {
   if (error instanceof JulesApiError) {
@@ -94,14 +92,15 @@ function isActive(session: Session) {
 
 export default function TaskHomeScreen() {
   const router = useRouter();
-  const { preference: languagePreference, setPreference: setLanguagePreference, language } = useAppLanguage();
-  const { preference: themePreference, setPreference: setThemePreference } = useAppTheme();
+  const themeColors = useTheme();
+  const { language } = useAppLanguage();
   const t = useMemo(() => createTranslator(language), [language]);
   const taskTemplates = useMemo(() => [
     t('taskFixBug'),
     t('taskExplainError'),
     t('taskAddTests'),
   ], [t]);
+
   const {
     sourceId: routeSourceId,
     startingBranch: routeStartingBranch,
@@ -111,17 +110,13 @@ export default function TaskHomeScreen() {
     startingBranch?: string | string[];
     draftPrompt?: string | string[];
   }>();
+
   const sourceId = getSingleRouteParam(routeSourceId);
   const startingBranch = getSingleRouteParam(routeStartingBranch);
   const draftPrompt = getSingleRouteParam(routeDraftPrompt);
   const scrollRef = useRef<ScrollView>(null);
 
   const [savedApiKey, setSavedApiKey] = useState('');
-  const [draftApiKey, setDraftApiKey] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAbout, setShowAbout] = useState(false);
-  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
-  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [isFormExpanded, setIsFormExpanded] = useState(true);
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
 
@@ -148,6 +143,7 @@ export default function TaskHomeScreen() {
     () => sources.find(source => source.name === selectedSourceName),
     [selectedSourceName, sources],
   );
+
   const availableBranches = useMemo(() => {
     const branches = selectedSource?.githubRepo?.branches?.map(branch => branch.displayName) ?? [];
     const defaultBranch = selectedSource?.githubRepo?.defaultBranch?.displayName;
@@ -159,15 +155,6 @@ export default function TaskHomeScreen() {
     active: recentSessions.filter(isActive),
     recent: recentSessions.filter(session => !isActionRequired(session) && !isActive(session)),
   }), [recentSessions]);
-  const appVersion = Constants.expoConfig?.version ?? '1.0.1';
-  const buildNumber = Constants.expoConfig?.ios?.buildNumber
-    ?? (Constants.expoConfig?.android?.versionCode ? String(Constants.expoConfig.android.versionCode) : '1');
-  const appMetadata = Constants.expoConfig?.extra?.appMetadata as { author?: string; brand?: string } | undefined;
-  const author = appMetadata?.author ?? 'San';
-  const brand = appMetadata?.brand ?? 'sanOmni';
-  const apiKeyStorageDescription = Platform.OS === 'web'
-    ? t('settingsDescriptionWeb')
-    : t('settingsDescriptionNative');
 
   const fetchWorkspace = useCallback(async (apiKey: string) => {
     if (!apiKey) return;
@@ -194,20 +181,44 @@ export default function TaskHomeScreen() {
   }, [t]);
 
   useEffect(() => {
-    const loadSavedKey = async () => {
-      const key = await getApiKey();
+    let disposed = false;
+    void getApiKey().then(key => {
+      if (disposed) return;
       if (!key) {
-        setShowSettings(true);
+        setSavedApiKey('');
+        setSources([]);
+        setRecentSessions([]);
+        setHasLoadedWorkspace(false);
         return;
       }
-
       setSavedApiKey(key);
-      setDraftApiKey(key);
       void fetchWorkspace(key);
+    });
+    return () => {
+      disposed = true;
     };
-
-    void loadSavedKey();
   }, [fetchWorkspace]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let disposed = false;
+      void getApiKey().then(key => {
+        if (disposed) return;
+        if (!key) {
+          setSavedApiKey('');
+          setSources([]);
+          setRecentSessions([]);
+          setHasLoadedWorkspace(false);
+          return;
+        }
+        setSavedApiKey(key);
+        void fetchWorkspace(key);
+      });
+      return () => {
+        disposed = true;
+      };
+    }, [fetchWorkspace]),
+  );
 
   useEffect(() => {
     if (!draftPrompt) return;
@@ -264,43 +275,6 @@ export default function TaskHomeScreen() {
     }
   };
 
-  const handleSaveApiKey = async () => {
-    const nextApiKey = draftApiKey.trim();
-    await saveApiKey(nextApiKey);
-    setSavedApiKey(nextApiKey);
-    if (!nextApiKey) {
-      setSources([]);
-      setSourcesNextPageToken(undefined);
-      setRecentSessions([]);
-      setSessionsNextPageToken(undefined);
-      setSelectedSourceName(null);
-      setSelectedBranch(null);
-      setWorkspaceError(null);
-      setHasLoadedWorkspace(false);
-      setLastSyncedAt(null);
-      setShowSettings(true);
-      return;
-    }
-
-    setShowSettings(false);
-    void fetchWorkspace(nextApiKey);
-  };
-
-  const handleClearApiKey = () => {
-    setDraftApiKey('');
-  };
-
-  const openAbout = () => {
-    setShowSettings(false);
-    setShowAbout(true);
-  };
-
-  const closeAbout = () => {
-    setShowAbout(false);
-    if (!savedApiKey) setShowSettings(true);
-  };
-
-
   const selectSource = (source: Source) => {
     const defaultBranch = source.githubRepo?.defaultBranch?.displayName;
     setSelectedSourceName(source.name);
@@ -311,7 +285,7 @@ export default function TaskHomeScreen() {
   const handleStartTask = async () => {
     const prompt = taskPrompt.trim();
     if (!savedApiKey) {
-      setShowSettings(true);
+      router.push('/settings');
       return;
     }
     if (!selectedSource || !selectedBranch) {
@@ -357,21 +331,32 @@ export default function TaskHomeScreen() {
     const status = getSessionStatus(session.state, t);
     const source = session.sourceContext?.source?.split('/').pop() || 'Jules';
     const title = session.title || session.prompt || t('untitledTask');
+
+    const statusStyle = {
+      attention: { bg: themeColors.statusAttentionBg, text: themeColors.statusAttentionText },
+      active: { bg: themeColors.statusActiveBg, text: themeColors.statusActiveText },
+      complete: { bg: themeColors.statusCompleteBg, text: themeColors.statusCompleteText },
+      failed: { bg: themeColors.statusFailedBg, text: themeColors.statusFailedText },
+      muted: { bg: themeColors.statusMutedBg, text: themeColors.statusMutedText },
+    }[status.tone];
+
     return (
       <TouchableOpacity
         key={session.name}
         accessibilityRole="button"
         accessibilityLabel={t('openSession', title)}
-        style={styles.sessionCard}
+        style={[styles.sessionCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}
         onPress={() => resumeSession(session)}
       >
         <View style={styles.sessionCardHeader}>
-          <Text style={styles.sessionTitle} numberOfLines={1}>{title}</Text>
-          <View style={[styles.statusPill, styles[`status${status.tone}`]]}>
-            <Text style={[styles.statusText, styles[`statusText${status.tone}`]]}>{status.label}</Text>
+          <Text style={[styles.sessionTitle, { color: themeColors.text }]} numberOfLines={1}>{title}</Text>
+          <View style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}>
+            <Text style={[styles.statusText, { color: statusStyle.text }]}>{status.label}</Text>
           </View>
         </View>
-        <Text style={styles.sessionMeta} numberOfLines={1}>{source} · {getRelativeTime(session.updateTime || session.createTime, t)}</Text>
+        <Text style={[styles.sessionMeta, { color: themeColors.textSecondary }]} numberOfLines={1}>
+          {source} · {getRelativeTime(session.updateTime || session.createTime, t)}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -390,16 +375,18 @@ export default function TaskHomeScreen() {
     taskPrompt.trim() && selectedSource && selectedBranch && savedApiKey && !isStartingSession,
   );
 
-
   return (
-    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safeArea}>
-      <View style={styles.screen}>
-        <View style={styles.topBar}>
-          <View>
-            <Text style={styles.brand}>JulesMe</Text>
-            <Text style={styles.topBarSubtext}>
-              {lastSyncedAt ? t('syncedAt', lastSyncedAt.toLocaleTimeString()) : t('workbench')}
-            </Text>
+    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: themeColors.background }]}>
+      <View style={[styles.screen, { backgroundColor: themeColors.background }]}>
+        <View style={[styles.topBar, { backgroundColor: themeColors.topBar, borderBottomColor: themeColors.topBarBorder }]}>
+          <View style={styles.brandRow}>
+            <Image source={require('@/assets/images/jules-logo.png')} style={styles.brandLogo} />
+            <View>
+              <Text style={[styles.brand, { color: themeColors.brand }]}>JulesMe</Text>
+              <Text style={[styles.topBarSubtext, { color: themeColors.textSecondary }]}>
+                {lastSyncedAt ? t('syncedAt', lastSyncedAt.toLocaleTimeString()) : t('workbench')}
+              </Text>
+            </View>
           </View>
           <View style={styles.topActions}>
             <TouchableOpacity
@@ -407,31 +394,36 @@ export default function TaskHomeScreen() {
               accessibilityLabel={t('refreshWorkspace')}
               disabled={!savedApiKey || isLoadingWorkspace}
               onPress={refreshWorkspace}
-              style={[styles.iconButton, (!savedApiKey || isLoadingWorkspace) && styles.iconButtonDisabled]}
+              style={[
+                styles.iconButton,
+                { backgroundColor: themeColors.brandSubtle },
+                (!savedApiKey || isLoadingWorkspace) && styles.iconButtonDisabled,
+              ]}
             >
-              <Text style={[styles.iconButtonText, styles.refreshIconText]}>↻</Text>
+              <Text style={[styles.iconButtonText, styles.refreshIconText, { color: themeColors.brand }]}>↻</Text>
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={t('openSettings')}
-              onPress={() => setShowSettings(true)}
-              style={styles.iconButton}
+              onPress={() => router.push('/settings')}
+              style={[styles.iconButton, { backgroundColor: themeColors.brandSubtle }]}
             >
-              <Text style={styles.iconButtonText}>⚙</Text>
+              <Text style={[styles.iconButtonText, { color: themeColors.brand }]}>⚙</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {isLoadingWorkspace && !hasLoadedWorkspace ? (
           <View style={styles.initialLoading}>
-            <ActivityIndicator size="large" color="#6D5CE7" />
-            <Text style={styles.initialLoadingText}>{t('syncingWorkspace')}</Text>
+            <ActivityIndicator size="large" color={themeColors.brand} />
+            <Text style={[styles.initialLoadingText, { color: themeColors.textSecondary }]}>{t('syncingWorkspace')}</Text>
           </View>
         ) : !savedApiKey ? (
           <View style={styles.initialLoading}>
-            <Text style={styles.initialLoadingTitle}>{t('connectJules')}</Text>
-            <Text style={styles.initialLoadingText}>{t('apiKeyStartHint')}</Text>
-            <TouchableOpacity style={styles.primaryButton} onPress={() => setShowSettings(true)}>
+            <Image source={require('@/assets/images/jules-logo.png')} style={styles.landingLogo} />
+            <Text style={[styles.initialLoadingTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
+            <Text style={[styles.initialLoadingText, { color: themeColors.textSecondary }]}>{t('apiKeyStartHint')}</Text>
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: themeColors.brand }]} onPress={() => router.push('/settings')}>
               <Text style={styles.primaryButtonText}>{t('configureApiKey')}</Text>
             </TouchableOpacity>
           </View>
@@ -441,9 +433,9 @@ export default function TaskHomeScreen() {
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
-            refreshControl={<RefreshControl refreshing={isLoadingWorkspace} onRefresh={refreshWorkspace} tintColor="#6D5CE7" />}
+            refreshControl={<RefreshControl refreshing={isLoadingWorkspace} onRefresh={refreshWorkspace} tintColor={themeColors.brand} />}
           >
-            <View style={styles.hero}>
+            <View style={[styles.hero, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={t('newTask')}
@@ -453,56 +445,60 @@ export default function TaskHomeScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.heroHeaderCopy}>
-                  <Text style={styles.eyebrow}>{t('newTask')}</Text>
-                  <Text style={styles.heroHeaderTitle} numberOfLines={1}>
+                  <Text style={[styles.eyebrow, { color: themeColors.brand }]}>{t('newTask')}</Text>
+                  <Text style={[styles.heroHeaderTitle, { color: themeColors.text }]} numberOfLines={1}>
                     {isFormExpanded
                       ? t('heroTitle')
                       : (selectedSource ? `${getSourceLabel(selectedSource, t)}${selectedBranch ? ` · ${selectedBranch}` : ''}` : t('heroTitle'))}
                   </Text>
                 </View>
-                <View style={styles.heroToggleCircle}>
-                  <Text style={styles.heroToggleArrow}>{isFormExpanded ? '⌃' : '⌄'}</Text>
+                <View style={[styles.heroToggleCircle, { backgroundColor: themeColors.brandSubtle }]}>
+                  <Text style={[styles.heroToggleArrow, { color: themeColors.brand }]}>{isFormExpanded ? '⌃' : '⌄'}</Text>
                 </View>
               </TouchableOpacity>
 
               {isFormExpanded ? (
                 <View style={styles.heroBody}>
-                  <Text style={styles.heroDescription}>{t('heroDescription')}</Text>
+                  <Text style={[styles.heroDescription, { color: themeColors.textSecondary }]}>{t('heroDescription')}</Text>
 
                   <View style={styles.contextRow}>
                     <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityLabel={t('chooseRepository')}
-                      style={styles.contextChip}
+                      style={[styles.contextChip, { backgroundColor: themeColors.chipBg, borderColor: themeColors.chipBorder }]}
                       onPress={() => setPickerMode('source')}
                     >
-                      <Text style={styles.contextChipLabel}>⌘ {getSourceLabel(selectedSource, t)}</Text>
+                      <Text style={[styles.contextChipLabel, { color: themeColors.brand }]}>⌘ {getSourceLabel(selectedSource, t)}</Text>
                       <View style={styles.contextChipArrowContainer}>
-                        <Text style={styles.contextChipArrow}>⌄</Text>
+                        <Text style={[styles.contextChipArrow, { color: themeColors.brand }]}>⌄</Text>
                       </View>
                     </TouchableOpacity>
                     <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityLabel={t('chooseStartingBranch')}
-                      style={[styles.contextChip, !selectedSource && styles.contextChipDisabled]}
+                      style={[
+                        styles.contextChip,
+                        { backgroundColor: themeColors.chipBg, borderColor: themeColors.chipBorder },
+                        !selectedSource && styles.contextChipDisabled,
+                      ]}
                       disabled={!selectedSource}
                       onPress={() => setPickerMode('branch')}
                     >
-                      <Text style={styles.contextChipLabel}>⑂ {selectedBranch || t('chooseBranch')}</Text>
+                      <Text style={[styles.contextChipLabel, { color: themeColors.brand }]}>⑂ {selectedBranch || t('chooseBranch')}</Text>
                       <View style={styles.contextChipArrowContainer}>
-                        <Text style={styles.contextChipArrow}>⌄</Text>
+                        <Text style={[styles.contextChipArrow, { color: themeColors.brand }]}>⌄</Text>
                       </View>
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.composer}>
+                  <View style={[styles.composer, { backgroundColor: themeColors.composerBg, borderColor: themeColors.composerBorder }]}>
                     <TextInput
                       accessibilityLabel={t('taskDescription')}
-                      style={styles.taskInput}
+                      style={[styles.taskInput, { color: themeColors.text }]}
                       value={taskPrompt}
                       onChangeText={setTaskPrompt}
                       placeholder={t('taskPlaceholder')}
-                      placeholderTextColor="#98A2B3"
+                      placeholderTextColor={themeColors.textMuted}
                       multiline
                       textAlignVertical="top"
                       maxLength={2000}
@@ -513,9 +509,9 @@ export default function TaskHomeScreen() {
                           accessibilityRole="button"
                           accessibilityLabel={t('clearForm')}
                           onPress={handleClearForm}
-                          style={styles.clearFormButton}
+                          style={[styles.clearFormButton, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
                         >
-                          <Text style={styles.clearFormButtonText}>{t('clearForm')}</Text>
+                          <Text style={[styles.clearFormButtonText, { color: themeColors.brand }]}>{t('clearForm')}</Text>
                         </TouchableOpacity>
                       ) : null}
                       <TouchableOpacity
@@ -523,7 +519,12 @@ export default function TaskHomeScreen() {
                         accessibilityLabel={t('startTask')}
                         disabled={!canStartTask}
                         onPress={handleStartTask}
-                        style={[styles.startButton, !canStartTask && styles.startButtonDisabled, isFormDirty && styles.startButtonFlexible]}
+                        style={[
+                          styles.startButton,
+                          { backgroundColor: themeColors.brand },
+                          !canStartTask && styles.startButtonDisabled,
+                          isFormDirty && styles.startButtonFlexible,
+                        ]}
                       >
                         {isStartingSession ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.startButtonText}>{t('startTaskButton')}</Text>}
                       </TouchableOpacity>
@@ -532,34 +533,38 @@ export default function TaskHomeScreen() {
 
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateRow}>
                     {taskTemplates.map(template => (
-                      <TouchableOpacity key={template} style={styles.templateChip} onPress={() => setTaskPrompt(template)}>
-                        <Text style={styles.templateText}>{template}</Text>
+                      <TouchableOpacity
+                        key={template}
+                        style={[styles.templateChip, { backgroundColor: themeColors.chipBg, borderColor: themeColors.chipBorder }]}
+                        onPress={() => setTaskPrompt(template)}
+                      >
+                        <Text style={[styles.templateText, { color: themeColors.textSecondary }]}>{template}</Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
 
-                  <View style={styles.optionRow}>
+                  <View style={[styles.optionRow, { borderTopColor: themeColors.cardBorder }]}>
                     <View style={styles.optionCopy}>
-                      <Text style={styles.optionTitle}>{t('requirePlanTitle')}</Text>
-                      <Text style={styles.optionDescription}>{t('requirePlanDescription')}</Text>
+                      <Text style={[styles.optionTitle, { color: themeColors.text }]}>{t('requirePlanTitle')}</Text>
+                      <Text style={[styles.optionDescription, { color: themeColors.textSecondary }]}>{t('requirePlanDescription')}</Text>
                     </View>
                     <Switch
                       value={requirePlanApproval}
                       onValueChange={setRequirePlanApproval}
-                      trackColor={{ false: '#D0D5DD', true: '#B6AEF5' }}
-                      thumbColor={requirePlanApproval ? '#6D5CE7' : '#FFFFFF'}
+                      trackColor={{ false: themeColors.composerBorder, true: themeColors.brandSubtle }}
+                      thumbColor={requirePlanApproval ? themeColors.brand : '#FFFFFF'}
                     />
                   </View>
-                  <View style={styles.optionRow}>
+                  <View style={[styles.optionRow, { borderTopColor: themeColors.cardBorder }]}>
                     <View style={styles.optionCopy}>
-                      <Text style={styles.optionTitle}>{t('autoPrTitle')}</Text>
-                      <Text style={styles.optionDescription}>{t('autoPrDescription')}</Text>
+                      <Text style={[styles.optionTitle, { color: themeColors.text }]}>{t('autoPrTitle')}</Text>
+                      <Text style={[styles.optionDescription, { color: themeColors.textSecondary }]}>{t('autoPrDescription')}</Text>
                     </View>
                     <Switch
                       value={autoCreatePr}
                       onValueChange={setAutoCreatePr}
-                      trackColor={{ false: '#D0D5DD', true: '#B6AEF5' }}
-                      thumbColor={autoCreatePr ? '#6D5CE7' : '#FFFFFF'}
+                      trackColor={{ false: themeColors.composerBorder, true: themeColors.brandSubtle }}
+                      thumbColor={autoCreatePr ? themeColors.brand : '#FFFFFF'}
                     />
                   </View>
                 </View>
@@ -578,31 +583,35 @@ export default function TaskHomeScreen() {
 
             {sessionsByPriority.needsAttention.length > 0 ? (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t('needsAttention')}</Text>
-                <Text style={styles.sectionDescription}>{t('needsAttentionDescription')}</Text>
+                <Text style={[styles.sectionTitle, { color: themeColors.text }]}>{t('needsAttention')}</Text>
+                <Text style={[styles.sectionDescription, { color: themeColors.textSecondary }]}>{t('needsAttentionDescription')}</Text>
                 {sessionsByPriority.needsAttention.map(renderSession)}
               </View>
             ) : null}
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t('activeTasks')}</Text>
+              <Text style={[styles.sectionTitle, { color: themeColors.text }]}>{t('activeTasks')}</Text>
               {sessionsByPriority.active.length > 0 ? (
                 sessionsByPriority.active.map(renderSession)
               ) : (
-                <Text style={styles.emptyText}>{t('noActiveTasks')}</Text>
+                <Text style={[styles.emptyText, { color: themeColors.textMuted }]}>{t('noActiveTasks')}</Text>
               )}
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t('recentSessions')}</Text>
+              <Text style={[styles.sectionTitle, { color: themeColors.text }]}>{t('recentSessions')}</Text>
               {sessionsByPriority.recent.length > 0 ? (
                 sessionsByPriority.recent.map(renderSession)
               ) : (
-                <Text style={styles.emptyText}>{t('noRecentSessions')}</Text>
+                <Text style={[styles.emptyText, { color: themeColors.textMuted }]}>{t('noRecentSessions')}</Text>
               )}
               {sessionsNextPageToken ? (
-                <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreSessions} disabled={isLoadingMoreSessions}>
-                  {isLoadingMoreSessions ? <ActivityIndicator size="small" color="#5B4BC4" /> : <Text style={styles.loadMoreText}>{t('loadMoreSessions')}</Text>}
+                <TouchableOpacity
+                  style={[styles.loadMoreButton, { borderColor: themeColors.composerBorder }]}
+                  onPress={loadMoreSessions}
+                  disabled={isLoadingMoreSessions}
+                >
+                  {isLoadingMoreSessions ? <ActivityIndicator size="small" color={themeColors.brand} /> : <Text style={[styles.loadMoreText, { color: themeColors.brand }]}>{t('loadMoreSessions')}</Text>}
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -613,223 +622,56 @@ export default function TaskHomeScreen() {
       <Modal visible={pickerMode !== null} animationType="slide" transparent onRequestClose={() => setPickerMode(null)}>
         <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.sheetOverlay}>
           <TouchableOpacity style={styles.sheetDismiss} activeOpacity={1} onPress={() => setPickerMode(null)} />
-          <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
+          <View style={[styles.sheet, { backgroundColor: themeColors.sheetBg }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: themeColors.cardBorder }]} />
+            <View style={[styles.sheetHeader, { borderBottomColor: themeColors.cardBorder }]}>
               <View>
-                <Text style={styles.sheetTitle}>{pickerMode === 'source' ? t('chooseRepository') : t('chooseStartingBranch')}</Text>
-                <Text style={styles.sheetDescription}>
+                <Text style={[styles.sheetTitle, { color: themeColors.text }]}>{pickerMode === 'source' ? t('chooseRepository') : t('chooseStartingBranch')}</Text>
+                <Text style={[styles.sheetDescription, { color: themeColors.textSecondary }]}>
                   {pickerMode === 'source' ? t('sourceSheetDescription') : getSourceLabel(selectedSource, t)}
                 </Text>
               </View>
-              <TouchableOpacity accessibilityLabel={t('cancel')} onPress={() => setPickerMode(null)} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>×</Text>
+              <TouchableOpacity accessibilityLabel={t('cancel')} onPress={() => setPickerMode(null)} style={[styles.closeButton, { backgroundColor: themeColors.brandSubtle }]}>
+                <Text style={[styles.closeButtonText, { color: themeColors.textSecondary }]}>×</Text>
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.sheetList} contentContainerStyle={styles.sheetListContent}>
               {pickerMode === 'source' ? sources.map(source => (
-                <TouchableOpacity key={source.name} style={styles.sheetItem} onPress={() => selectSource(source)}>
+                <TouchableOpacity
+                  key={source.name}
+                  style={[styles.sheetItem, { backgroundColor: themeColors.sheetItemBg, borderColor: themeColors.cardBorder }]}
+                  onPress={() => selectSource(source)}
+                >
                   <View style={styles.sheetItemCopy}>
-                    <Text style={styles.sheetItemTitle}>{getSourceLabel(source, t)}</Text>
-                    <Text style={styles.sheetItemSubtitle} numberOfLines={1}>
+                    <Text style={[styles.sheetItemTitle, { color: themeColors.text }]}>{getSourceLabel(source, t)}</Text>
+                    <Text style={[styles.sheetItemSubtitle, { color: themeColors.textSecondary }]} numberOfLines={1}>
                       {source.githubRepo?.isPrivate ? t('privateRepository') : t('githubRepository')} · {source.githubRepo?.defaultBranch?.displayName || t('noDefaultBranch')}
                     </Text>
                   </View>
-                  {selectedSourceName === source.name ? <Text style={styles.selectedMark}>✓</Text> : null}
+                  {selectedSourceName === source.name ? <Text style={[styles.selectedMark, { color: themeColors.brand }]}>✓</Text> : null}
                 </TouchableOpacity>
               )) : availableBranches.map(branch => (
                 <TouchableOpacity
                   key={branch}
-                  style={styles.sheetItem}
+                  style={[styles.sheetItem, { backgroundColor: themeColors.sheetItemBg, borderColor: themeColors.cardBorder }]}
                   onPress={() => {
                     setSelectedBranch(branch);
                     setPickerMode(null);
                   }}
                 >
-                  <Text style={styles.sheetItemTitle}>{branch}</Text>
-                  {selectedBranch === branch ? <Text style={styles.selectedMark}>✓</Text> : null}
+                  <Text style={[styles.sheetItemTitle, { color: themeColors.text }]}>{branch}</Text>
+                  {selectedBranch === branch ? <Text style={[styles.selectedMark, { color: themeColors.brand }]}>✓</Text> : null}
                 </TouchableOpacity>
               ))}
               {pickerMode === 'branch' && availableBranches.length === 0 ? (
-                <Text style={styles.emptyText}>{t('noBranches')}</Text>
+                <Text style={[styles.emptyText, { color: themeColors.textMuted }]}>{t('noBranches')}</Text>
               ) : null}
               {pickerMode === 'source' && sourcesNextPageToken ? (
-                <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreSources} disabled={isLoadingMoreSources}>
-                  {isLoadingMoreSources ? <ActivityIndicator size="small" color="#5B4BC4" /> : <Text style={styles.loadMoreText}>{t('loadMoreRepositories')}</Text>}
+                <TouchableOpacity style={[styles.loadMoreButton, { borderColor: themeColors.composerBorder }]} onPress={loadMoreSources} disabled={isLoadingMoreSources}>
+                  {isLoadingMoreSources ? <ActivityIndicator size="small" color={themeColors.brand} /> : <Text style={[styles.loadMoreText, { color: themeColors.brand }]}>{t('loadMoreRepositories')}</Text>}
                 </TouchableOpacity>
               ) : null}
             </ScrollView>
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      <Modal visible={showSettings} animationType="fade" transparent onRequestClose={() => setShowSettings(false)}>
-        <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.settingsOverlay}>
-          <View style={styles.settingsCard}>
-            <View style={styles.settingsHeader}>
-              <Text style={styles.settingsTitle}>{t('connectJules')}</Text>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={t('closeSettings')}
-                style={styles.closeButton}
-                onPress={() => setShowSettings(false)}
-              >
-                <Text style={styles.closeButtonText}>×</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.settingsDescription}>{apiKeyStorageDescription}</Text>
-            <Text style={styles.settingsLabel}>Jules API Key</Text>
-            <View style={styles.settingsInputRow}>
-              <TextInput
-                accessibilityLabel="Jules API Key"
-                style={styles.settingsInput}
-                value={draftApiKey}
-                onChangeText={setDraftApiKey}
-                placeholder={t('pasteApiKey')}
-                placeholderTextColor="#98A2B3"
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={t('clearApiKey')}
-                disabled={!draftApiKey}
-                style={[styles.clearApiKeyButton, !draftApiKey && styles.clearApiKeyButtonDisabled]}
-                onPress={handleClearApiKey}
-              >
-                <Text style={styles.clearApiKeyText}>×</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.settingsButtons}>
-              <TouchableOpacity style={styles.settingsSave} onPress={handleSaveApiKey}>
-                <Text style={styles.settingsSaveText}>{t('saveAndConnect')}</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.languageSection}>
-              <Text style={styles.settingsLabel}>{t('theme')}</Text>
-              <Text style={styles.languageDescription}>{t('themeDescription')}</Text>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={t('theme')}
-                accessibilityState={{ expanded: showThemeMenu }}
-                style={[styles.languageSelect, showThemeMenu && styles.languageSelectOpen]}
-                onPress={() => setShowThemeMenu(current => !current)}
-              >
-                <Text style={styles.languageSelectText}>{getThemeName(themePreference, t)}</Text>
-                <Text style={styles.languageSelectArrow}>{showThemeMenu ? '⌃' : '⌄'}</Text>
-              </TouchableOpacity>
-              {showThemeMenu ? (
-                <View style={styles.languageMenu}>
-                  {themeOptions.map(option => (
-                    <TouchableOpacity
-                      key={option}
-                      accessibilityRole="menuitem"
-                      accessibilityState={{ selected: themePreference === option }}
-                      style={[styles.languageMenuItem, themePreference === option && styles.languageMenuItemSelected]}
-                      onPress={() => {
-                        setShowThemeMenu(false);
-                        void setThemePreference(option);
-                      }}
-                    >
-                      <Text style={[styles.languageMenuItemText, themePreference === option && styles.languageMenuItemTextSelected]}>
-                        {getThemeName(option, t)}
-                      </Text>
-                      {themePreference === option ? <Text style={styles.languageMenuCheck}>✓</Text> : null}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-            <View style={styles.languageSection}>
-              <Text style={styles.settingsLabel}>{t('language')}</Text>
-              <Text style={styles.languageDescription}>{t('languageDescription')}</Text>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={t('language')}
-                accessibilityState={{ expanded: showLanguageMenu }}
-                style={[styles.languageSelect, showLanguageMenu && styles.languageSelectOpen]}
-                onPress={() => setShowLanguageMenu(current => !current)}
-              >
-                <Text style={styles.languageSelectText}>{getLanguageName(languagePreference)}</Text>
-                <Text style={styles.languageSelectArrow}>{showLanguageMenu ? '⌃' : '⌄'}</Text>
-              </TouchableOpacity>
-              {showLanguageMenu ? (
-                <View style={styles.languageMenu}>
-                  {languageOptions.map(option => (
-                    <TouchableOpacity
-                      key={option}
-                      accessibilityRole="menuitem"
-                      accessibilityState={{ selected: languagePreference === option }}
-                      style={[styles.languageMenuItem, languagePreference === option && styles.languageMenuItemSelected]}
-                      onPress={() => {
-                        setShowLanguageMenu(false);
-                        void setLanguagePreference(option);
-                      }}
-                    >
-                      <Text style={[styles.languageMenuItemText, languagePreference === option && styles.languageMenuItemTextSelected]}>
-                        {getLanguageName(option)}
-                      </Text>
-                      {languagePreference === option ? <Text style={styles.languageMenuCheck}>✓</Text> : null}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={t('openAboutJulesMe')}
-              style={styles.aboutEntry}
-              onPress={openAbout}
-            >
-              <View>
-                <Text style={styles.aboutEntryTitle}>{t('aboutJulesMe')}</Text>
-                <Text style={styles.aboutEntryDescription}>{t('aboutDescription')}</Text>
-              </View>
-              <Text style={styles.aboutEntryArrow}>›</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      <Modal visible={showAbout} animationType="fade" transparent onRequestClose={closeAbout}>
-        <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.settingsOverlay}>
-          <View style={[styles.settingsCard, styles.aboutCard]}>
-            <View style={styles.aboutHeader}>
-              <View>
-                <Text style={styles.settingsTitle}>{t('aboutJulesMe')}</Text>
-                <Text style={styles.settingsDescription}>{t('aboutSubtitle', brand)}</Text>
-              </View>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('closeAbout')} style={styles.closeButton} onPress={closeAbout}>
-                <Text style={styles.closeButtonText}>×</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.aboutInfoList}>
-              <View style={styles.aboutInfoRow}>
-                <Text style={styles.aboutInfoLabel}>{t('appVersion')}</Text>
-                <Text style={styles.aboutInfoValue}>v{appVersion} ({t('build')} {buildNumber})</Text>
-              </View>
-              <View style={styles.aboutInfoRow}>
-                <Text style={styles.aboutInfoLabel}>{t('brand')}</Text>
-                <Text style={styles.aboutInfoValue}>{brand}</Text>
-              </View>
-              <View style={styles.aboutInfoRow}>
-                <Text style={styles.aboutInfoLabel}>{t('author')}</Text>
-                <Text style={styles.aboutInfoValue}>{author}</Text>
-              </View>
-              <View style={styles.aboutInfoRow}>
-                <Text style={styles.aboutInfoLabel}>{t('dataPrivacy')}</Text>
-                <Text style={styles.aboutInfoValue}>{apiKeyStorageDescription}</Text>
-              </View>
-            </View>
-
-
-            <View style={styles.releaseNotes}>
-              <Text style={styles.releaseNotesTitle}>{t('releaseNotesTitle')}</Text>
-              <Text style={styles.releaseNotesText}>{t('releaseNotesText')}</Text>
-            </View>
           </View>
         </SafeAreaView>
       </Modal>
@@ -838,137 +680,189 @@ export default function TaskHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F7F7FC' },
-  screen: { flex: 1, backgroundColor: '#F7F7FC' },
-  topBar: { minHeight: 70, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E9E7F5', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  brand: { color: '#5B4BC4', fontSize: 23, lineHeight: 26, fontWeight: '800', letterSpacing: -0.6 },
-  topBarSubtext: { color: '#7A7595', fontSize: 12, marginTop: 2 },
-  topActions: { flexDirection: 'row', gap: 4 },
-  iconButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4F2FF' },
+  safeArea: { flex: 1 },
+  screen: { flex: 1 },
+  topBar: {
+    minHeight: 70,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  brandLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  landingLogo: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    marginBottom: 8,
+  },
+  brand: {
+    fontSize: 23,
+    lineHeight: 26,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+  },
+  topBarSubtext: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  topActions: { flexDirection: 'row', gap: 6 },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   iconButtonDisabled: { opacity: 0.45 },
-  iconButtonText: { color: '#5B4BC4', fontSize: 20, lineHeight: 20, fontWeight: '600', textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false },
+  iconButtonText: {
+    fontSize: 20,
+    lineHeight: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
   refreshIconText: { marginTop: -2 },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40, gap: 24 },
   initialLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 38, gap: 12 },
-  initialLoadingTitle: { color: '#2B2548', fontSize: 22, fontWeight: '800' },
-  initialLoadingText: { color: '#726D86', fontSize: 14, lineHeight: 21, textAlign: 'center' },
-  hero: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#E8E5FA', shadowColor: '#59489D', shadowOpacity: 0.06, shadowOffset: { width: 0, height: 8 }, shadowRadius: 20, elevation: 2 },
+  initialLoadingTitle: { fontSize: 22, fontWeight: '800' },
+  initialLoadingText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  hero: {
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 16,
+    elevation: 2,
+  },
   heroHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   heroHeaderCopy: { flex: 1 },
-  heroHeaderTitle: { color: '#25213D', fontSize: 20, lineHeight: 26, fontWeight: '800', marginTop: 3, letterSpacing: -0.3 },
-  heroToggleCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F4F2FF', alignItems: 'center', justifyContent: 'center' },
-  heroToggleArrow: { color: '#6656D7', fontSize: 18, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
+  heroHeaderTitle: { fontSize: 20, lineHeight: 26, fontWeight: '800', marginTop: 3, letterSpacing: -0.3 },
+  heroToggleCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  heroToggleArrow: { fontSize: 18, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
   heroBody: { marginTop: 10 },
-  eyebrow: { color: '#6D5CE7', fontSize: 13, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
-  heroTitle: { color: '#25213D', fontSize: 24, lineHeight: 31, fontWeight: '800', marginTop: 5, letterSpacing: -0.4 },
-
-  heroDescription: { color: '#77718B', fontSize: 14, lineHeight: 21, marginTop: 5 },
+  eyebrow: { fontSize: 13, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
+  heroTitle: { fontSize: 24, lineHeight: 31, fontWeight: '800', marginTop: 5, letterSpacing: -0.4 },
+  heroDescription: { fontSize: 14, lineHeight: 21, marginTop: 5 },
   contextRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 },
-  contextChip: { minHeight: 40, maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, paddingHorizontal: 12, backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: '#E3DFFF' },
+  contextChip: {
+    minHeight: 40,
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+  },
   contextChipDisabled: { opacity: 0.45 },
-  contextChipLabel: { maxWidth: 220, color: '#463B8B', fontSize: 13, fontWeight: '700' },
+  contextChipLabel: { maxWidth: 220, fontSize: 13, fontWeight: '700' },
   contextChipArrowContainer: { width: 16, height: 20, alignItems: 'center', justifyContent: 'center' },
-  contextChipArrow: { color: '#7668C8', fontSize: 16, lineHeight: 16, textAlign: 'center', includeFontPadding: false },
-  composer: { marginTop: 14, borderWidth: 1, borderColor: '#DCD6FA', borderRadius: 18, padding: 12, backgroundColor: '#FCFBFF' },
-  taskInput: { minHeight: 116, color: '#27213E', fontSize: 16, lineHeight: 23, paddingHorizontal: 4, paddingTop: 4, paddingBottom: 12 },
+  contextChipArrow: { fontSize: 16, lineHeight: 16, textAlign: 'center', includeFontPadding: false },
+  composer: { marginTop: 14, borderWidth: 1, borderRadius: 18, padding: 12 },
+  taskInput: { minHeight: 116, fontSize: 16, lineHeight: 23, paddingHorizontal: 4, paddingTop: 4, paddingBottom: 12 },
   composerFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
-  clearFormButton: { minHeight: 48, borderRadius: 13, backgroundColor: '#F2F0FB', borderWidth: 1, borderColor: '#E2DEF7', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  clearFormButtonText: { color: '#6656D7', fontSize: 14, fontWeight: '700' },
-  startButton: { minHeight: 48, borderRadius: 13, backgroundColor: '#6656D7', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  clearFormButton: {
+    minHeight: 48,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  clearFormButtonText: { fontSize: 14, fontWeight: '700' },
+  startButton: {
+    minHeight: 48,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
   startButtonFlexible: { flex: 1 },
-  startButtonDisabled: { backgroundColor: '#CFC9F1' },
+  startButtonDisabled: { opacity: 0.4 },
   startButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   templateRow: { gap: 8, paddingTop: 12, paddingBottom: 2 },
-  templateChip: { backgroundColor: '#F6F5FC', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#ECEAF5' },
-  templateText: { color: '#5E5874', fontSize: 12, fontWeight: '600' },
-  optionRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, paddingTop: 13, marginTop: 2, borderTopWidth: 1, borderTopColor: '#F0EEF8' },
+  templateChip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1 },
+  templateText: { fontSize: 12, fontWeight: '600' },
+  optionRow: {
+    minHeight: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 14,
+    paddingTop: 13,
+    marginTop: 2,
+    borderTopWidth: 1,
+  },
   optionCopy: { flex: 1 },
-  optionTitle: { color: '#3B3552', fontSize: 14, fontWeight: '800' },
-  optionDescription: { color: '#7A7590', fontSize: 12, lineHeight: 17, marginTop: 2 },
+  optionTitle: { fontSize: 14, fontWeight: '800' },
+  optionDescription: { fontSize: 12, lineHeight: 17, marginTop: 2 },
   errorCard: { backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FFD8D8', borderRadius: 16, padding: 15 },
   errorTitle: { color: '#B42318', fontSize: 14, fontWeight: '800' },
   errorText: { color: '#8D3028', fontSize: 13, lineHeight: 19, marginTop: 4 },
   errorRetry: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 4 },
   errorRetryText: { color: '#B42318', fontSize: 13, fontWeight: '800' },
   section: { gap: 10 },
-  sectionTitle: { color: '#302B47', fontSize: 17, fontWeight: '800' },
-  sectionDescription: { color: '#7B768D', fontSize: 13, lineHeight: 19, marginTop: -4 },
-  sessionCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 15, borderWidth: 1, borderColor: '#ECEAF4' },
+  sectionTitle: { fontSize: 17, fontWeight: '800' },
+  sectionDescription: { fontSize: 13, lineHeight: 19, marginTop: -4 },
+  sessionCard: { borderRadius: 16, padding: 15, borderWidth: 1 },
   sessionCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sessionTitle: { flex: 1, color: '#332E49', fontSize: 15, fontWeight: '800' },
-  sessionMeta: { color: '#817B93', fontSize: 12, marginTop: 8 },
+  sessionTitle: { flex: 1, fontSize: 15, fontWeight: '800' },
+  sessionMeta: { fontSize: 12, marginTop: 8 },
   statusPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
   statusText: { fontSize: 11, fontWeight: '800' },
-  statusattention: { backgroundColor: '#FFF3D8' },
-  statusTextattention: { color: '#8A5B00' },
-  statusactive: { backgroundColor: '#E7E5FF' },
-  statusTextactive: { color: '#5547B4' },
-  statuscomplete: { backgroundColor: '#E7F8EE' },
-  statusTextcomplete: { color: '#197044' },
-  statusfailed: { backgroundColor: '#FFE8E7' },
-  statusTextfailed: { color: '#B42318' },
-  statusmuted: { backgroundColor: '#F0EFF4' },
-  statusTextmuted: { color: '#666176' },
-  emptyText: { color: '#8A8499', fontSize: 13, lineHeight: 20, paddingVertical: 6 },
-  loadMoreButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DCD6FA', borderRadius: 12, marginTop: 2 },
-  loadMoreText: { color: '#5B4BC4', fontSize: 13, fontWeight: '800' },
-  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(25, 20, 51, 0.35)' },
+  emptyText: { fontSize: 13, lineHeight: 20, paddingVertical: 6 },
+  loadMoreButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 12, marginTop: 2 },
+  loadMoreText: { fontSize: 13, fontWeight: '800' },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
   sheetDismiss: { flex: 1 },
-  sheet: { maxHeight: '78%', backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10 },
-  sheetHandle: { alignSelf: 'center', width: 42, height: 5, borderRadius: 4, backgroundColor: '#D9D5E8' },
-  sheetHeader: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: '#F0EEF6' },
-  sheetTitle: { color: '#2D2747', fontSize: 19, fontWeight: '800' },
-  sheetDescription: { color: '#7D778E', fontSize: 12, maxWidth: 280, lineHeight: 18, marginTop: 4 },
-  closeButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F4F2FA', alignItems: 'center', justifyContent: 'center' },
-  closeButtonText: { color: '#5C5570', fontSize: 24, lineHeight: 27 },
+  sheet: { maxHeight: '78%', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10 },
+  sheetHandle: { alignSelf: 'center', width: 42, height: 5, borderRadius: 4 },
+  sheetHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 13,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    borderBottomWidth: 1,
+  },
+  sheetTitle: { fontSize: 19, fontWeight: '800' },
+  sheetDescription: { fontSize: 12, maxWidth: 280, lineHeight: 18, marginTop: 4 },
+  closeButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  closeButtonText: { fontSize: 24, lineHeight: 27 },
   sheetList: { flexGrow: 0 },
   sheetListContent: { padding: 12, paddingBottom: 30, gap: 8 },
-  sheetItem: { minHeight: 62, borderRadius: 14, backgroundColor: '#FAF9FD', borderWidth: 1, borderColor: '#F0EEF6', paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  sheetItem: {
+    minHeight: 62,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   sheetItemCopy: { flex: 1 },
-  sheetItemTitle: { flex: 1, color: '#39324E', fontSize: 14, fontWeight: '800' },
-  sheetItemSubtitle: { color: '#827C91', fontSize: 12, marginTop: 4 },
-  selectedMark: { color: '#5B4BC4', fontSize: 19, fontWeight: '800' },
-  settingsOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 22, backgroundColor: 'rgba(25, 20, 51, 0.44)' },
-  settingsCard: { width: '100%', maxWidth: 420, borderRadius: 22, backgroundColor: '#FFFFFF', padding: 22 },
-  settingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
-  settingsTitle: { color: '#2D2747', fontSize: 21, fontWeight: '800' },
-  settingsDescription: { color: '#756F86', fontSize: 13, lineHeight: 19, marginTop: 6 },
-  settingsLabel: { color: '#4D465E', fontSize: 13, fontWeight: '800', marginTop: 20, marginBottom: 8 },
-  settingsInputRow: { minHeight: 48, borderRadius: 12, backgroundColor: '#F7F6FB', borderWidth: 1, borderColor: '#E2DFEB', flexDirection: 'row', alignItems: 'center' },
-  settingsInput: { flex: 1, minHeight: 46, paddingLeft: 13, paddingRight: 6, color: '#2D2747', fontSize: 15 },
-  clearApiKeyButton: { width: 38, height: 38, marginRight: 5, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1EFF6' },
-  clearApiKeyButtonDisabled: { opacity: 0.35 },
-  clearApiKeyText: { color: '#6B6479', fontSize: 22, lineHeight: 24, fontWeight: '700' },
-  settingsButtons: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  settingsSave: { flex: 1, minHeight: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6656D7' },
-  settingsSaveText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  languageSection: { marginTop: 2 },
-  languageDescription: { color: '#756F86', fontSize: 12, lineHeight: 18, marginBottom: 10 },
-  languageSelect: { minHeight: 46, borderRadius: 12, paddingHorizontal: 13, backgroundColor: '#F7F6FB', borderWidth: 1, borderColor: '#E2DFEB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  languageSelectOpen: { borderColor: '#BDB4F4', backgroundColor: '#FCFBFF' },
-  languageSelectText: { flex: 1, color: '#2D2747', fontSize: 14, fontWeight: '800' },
-  languageSelectArrow: { width: 22, color: '#6656D7', fontSize: 18, lineHeight: 20, textAlign: 'center', fontWeight: '800' },
-  languageMenu: { marginTop: 8, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2DFEB', overflow: 'hidden' },
-  languageMenuItem: { minHeight: 44, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: '#F0EEF6' },
-  languageMenuItemSelected: { backgroundColor: '#EEEAFE' },
-  languageMenuItemText: { flex: 1, color: '#4D465E', fontSize: 14, fontWeight: '700' },
-  languageMenuItemTextSelected: { color: '#5141B8', fontWeight: '800' },
-  languageMenuCheck: { color: '#6656D7', fontSize: 16, fontWeight: '800' },
-  aboutEntry: { minHeight: 62, marginTop: 18, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#F7F6FB', borderWidth: 1, borderColor: '#E2DFEB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  aboutEntryTitle: { color: '#3F3855', fontSize: 14, fontWeight: '800' },
-  aboutEntryDescription: { color: '#7A748B', fontSize: 12, marginTop: 3 },
-  aboutEntryArrow: { color: '#6656D7', fontSize: 28, lineHeight: 30 },
-  aboutCard: { maxHeight: '86%' },
-  aboutHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
-  aboutInfoList: { marginTop: 20, borderTopWidth: 1, borderTopColor: '#EEEAF6' },
-  aboutInfoRow: { paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#EEEAF6', gap: 4 },
-  aboutInfoLabel: { color: '#756F86', fontSize: 12, fontWeight: '700' },
-  aboutInfoValue: { color: '#39324E', fontSize: 14, lineHeight: 20, fontWeight: '700' },
-
-  releaseNotes: { marginTop: 16 },
-  releaseNotesTitle: { color: '#4D465E', fontSize: 13, fontWeight: '800' },
-  releaseNotesText: { color: '#756F86', fontSize: 13, lineHeight: 19, marginTop: 4 },
-  primaryButton: { backgroundColor: '#6656D7', borderRadius: 13, paddingHorizontal: 18, paddingVertical: 13, marginTop: 6 },
+  sheetItemTitle: { flex: 1, fontSize: 14, fontWeight: '800' },
+  sheetItemSubtitle: { fontSize: 12, marginTop: 4 },
+  selectedMark: { fontSize: 19, fontWeight: '800' },
+  primaryButton: { borderRadius: 13, paddingHorizontal: 18, paddingVertical: 13, marginTop: 6 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
 });

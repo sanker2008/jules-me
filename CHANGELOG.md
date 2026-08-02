@@ -2,6 +2,19 @@
 
 All notable changes to JulesMe are documented in this file.
 
+## [1.1.4] - 2026-08-02
+
+### Added
+
+- Dedicated Settings screen at `/settings` for API key, theme selection, language, and about info.
+- Official brand Jules logo integrated into navigation headers, splash screen, and settings.
+
+### Fixed
+
+- Fixed dark mode theme colors so screens, text, inputs, cards, and pills update dynamically.
+- Synchronized native mobile status bar background and icon contrast for light and dark modes.
+- Eliminated modal popup flickering during settings option selection.
+
 ## [1.1.1] - 2026-07-27
 
 ### Changed

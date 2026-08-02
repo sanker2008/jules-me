@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform, useColorScheme as useRNColorScheme } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import * as SystemUI from 'expo-system-ui';
 
 export type AppTheme = 'light' | 'dark';
 export type ThemePreference = 'system' | AppTheme;
@@ -68,6 +69,21 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     if (preference !== 'system') return preference;
     return systemScheme === 'dark' ? 'dark' : 'light';
   }, [preference, systemScheme]);
+
+  useEffect(() => {
+    const bgColor = theme === 'dark' ? '#0F0E17' : '#F7F7FC';
+    if (Platform.OS === 'web') {
+      if (typeof document !== 'undefined') {
+        document.documentElement.style.colorScheme = theme;
+        document.documentElement.setAttribute('data-theme', theme);
+        if (document.body) {
+          document.body.style.backgroundColor = bgColor;
+        }
+      }
+    } else {
+      void SystemUI.setBackgroundColorAsync(bgColor).catch(() => {});
+    }
+  }, [theme]);
 
   const setPreference = async (newPreference: ThemePreference) => {
     setPreferenceState(newPreference);
