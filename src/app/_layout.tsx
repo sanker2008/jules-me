@@ -10,10 +10,9 @@ SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { theme } = useAppTheme();
-  const barBgColor = theme === 'dark' ? '#0F0E17' : '#F7F7FC';
   return (
     <ThemeProvider value={theme === 'dark' ? DarkTheme : DefaultTheme}>
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} backgroundColor={barBgColor} animated />
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} animated />
       <AnimatedSplashOverlay />
       <Stack screenOptions={{ headerShown: false }} />
     </ThemeProvider>

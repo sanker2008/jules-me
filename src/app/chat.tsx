@@ -634,11 +634,11 @@ export default function ChatScreen() {
       return (
         <View style={[styles.eventCard, styles.planCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
           <View style={styles.eventMetaRow}>
-            <Text style={[styles.eventEyebrow, { color: themeColors.brand }]}>{t('planTitle')}</Text>
+            <Text style={[styles.eventEyebrow, { color: themeColors.brand }]}>{t('planGenerated')}</Text>
             <Text style={[styles.eventTime, { color: themeColors.textSecondary }]}>{formatActivityTime(item.timestamp, t)}</Text>
           </View>
           <Text style={[styles.eventTitle, { color: themeColors.text }]}>{item.title}</Text>
-          <Text style={[styles.planHint, { color: themeColors.textSecondary }]}>{t('reviewPlanHint')}</Text>
+          <Text style={[styles.planHint, { color: themeColors.textSecondary }]}>{t('planHint')}</Text>
           {steps.map((step, index) => {
             const stepId = `${item.id}-step-${index}`;
             const isStepExpanded = expandedPlanSteps.has(stepId);
@@ -648,7 +648,7 @@ export default function ChatScreen() {
               <View key={stepId} style={styles.planStep}>
                 <Text style={[styles.planIndex, { backgroundColor: themeColors.brandSubtle, color: themeColors.brand }]}>{index + 1}</Text>
                 <View style={styles.planCopy}>
-                  <Text style={[styles.planStepTitle, { color: themeColors.text }]}>{step.title || t('stepNumber', index + 1)}</Text>
+                  <Text style={[styles.planStepTitle, { color: themeColors.text }]}>{step.title || `${index + 1}`}</Text>
                   {previewText ? (
                     <Text style={[styles.planStepPreview, { color: themeColors.textSecondary }]} numberOfLines={isStepExpanded ? undefined : 2}>
                       {previewText}
@@ -656,7 +656,9 @@ export default function ChatScreen() {
                   ) : null}
                   {step.description ? (
                     <TouchableOpacity accessibilityRole="button" onPress={() => togglePlanStep(stepId)} style={styles.planDetailButton}>
-                      <Text style={[styles.planDetailButtonText, { color: themeColors.brand }]}>{isStepExpanded ? t('hideDetails') : t('showDetails')}</Text>
+                      <Text style={[styles.planDetailButtonText, { color: themeColors.brand }]}>
+                        {isStepExpanded ? t('collapseTechnicalDetails') : t('viewTechnicalDetails')}
+                      </Text>
                     </TouchableOpacity>
                   ) : null}
                   {isStepExpanded && step.description ? (
@@ -669,7 +671,7 @@ export default function ChatScreen() {
           {waitingForPlan ? (
             <View style={styles.planActions}>
               <TouchableOpacity style={[styles.approveButton, { backgroundColor: themeColors.brand }]} onPress={handleApprovePlan} disabled={isApproving}>
-                {isApproving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.approveButtonText}>{t('approveAndStart')}</Text>}
+                {isApproving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.approveButtonText}>{t('approveAndRun')}</Text>}
               </TouchableOpacity>
             </View>
           ) : null}
@@ -733,7 +735,7 @@ export default function ChatScreen() {
         {waitingForPlan || waitingForFeedback ? (
           <View style={[styles.attentionBanner, { backgroundColor: themeColors.statusAttentionBg, borderBottomColor: themeColors.cardBorder }]}>
             <Text style={[styles.attentionBannerText, { color: themeColors.statusAttentionText }]}>
-              {waitingForPlan ? t('waitingPlanApproval') : t('waitingUserFeedback')}
+              {waitingForPlan ? t('planReadyBanner') : t('feedbackBanner')}
             </Text>
           </View>
         ) : null}
@@ -764,7 +766,7 @@ export default function ChatScreen() {
             <View style={styles.listHeader}>
               {session?.prompt ? (
                 <View style={[styles.taskSummary, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}>
-                  <Text style={[styles.taskSummaryLabel, { color: themeColors.brand }]}>{t('originalPrompt')}</Text>
+                  <Text style={[styles.taskSummaryLabel, { color: themeColors.brand }]}>{t('taskGoal')}</Text>
                   <Text style={[styles.taskSummaryText, { color: themeColors.text }]}>{session.prompt}</Text>
                 </View>
               ) : null}
@@ -774,14 +776,14 @@ export default function ChatScreen() {
                   <Text style={[styles.deliveryEyebrow, activeState === 'FAILED' && styles.deliveryEyebrowFailed]}>
                     {activeState === 'COMPLETED' ? t('taskCompleted') : t('taskIncomplete')}
                   </Text>
-                  <Text style={styles.deliveryTitle}>{activeState === 'COMPLETED' ? t('readyToReview') : t('sessionFailedTitle')}</Text>
+                  <Text style={styles.deliveryTitle}>{activeState === 'COMPLETED' ? t('prCreatedDelivery') : t('failedDelivery')}</Text>
                   <Text style={styles.deliveryText}>
-                    {activeState === 'COMPLETED' ? t('prCreatedSuccess', deliveryMetrics.changeSets) : (session?.stateReason || t('sessionFailedText'))}
+                    {activeState === 'COMPLETED' ? t('completedDelivery') : t('sessionFailedText')}
                   </Text>
                   {activeState === 'COMPLETED' ? (
                     <View style={styles.deliveryMetrics}>
-                      <View style={styles.deliveryMetric}><Text style={styles.deliveryMetricText}>{t('changeSetsCount', deliveryMetrics.changeSets)}</Text></View>
-                      <View style={styles.deliveryMetric}><Text style={styles.deliveryMetricText}>{t('commandsPassed', deliveryMetrics.successfulCommands, deliveryMetrics.commands)}</Text></View>
+                      <View style={styles.deliveryMetric}><Text style={styles.deliveryMetricText}>{t('changesCount', deliveryMetrics.changeSets)}</Text></View>
+                      <View style={styles.deliveryMetric}><Text style={styles.deliveryMetricText}>{t('commandSuccessCount', deliveryMetrics.successfulCommands, deliveryMetrics.commands)}</Text></View>
                     </View>
                   ) : null}
                   {firstPullRequest ? (
