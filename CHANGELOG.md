@@ -2,6 +2,12 @@
 
 All notable changes to JulesMe are documented in this file.
 
+## [1.1.5] - 2026-08-11
+
+### Added
+
+- Added capability to send messages to active terminal sessions in chat.
+
 ## [1.1.4] - 2026-08-02
 
 ### Added
