@@ -285,7 +285,7 @@ export default function TaskHomeScreen() {
   const handleStartTask = async () => {
     const prompt = taskPrompt.trim();
     if (!savedApiKey) {
-      router.push('/settings');
+      router.push('/settings' as any);
       return;
     }
     if (!selectedSource || !selectedBranch) {
@@ -405,7 +405,7 @@ export default function TaskHomeScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={t('openSettings')}
-              onPress={() => router.push('/settings')}
+              onPress={() => router.push('/settings' as any)}
               style={[styles.iconButton, { backgroundColor: themeColors.brandSubtle }]}
             >
               <Text style={[styles.iconButtonText, { color: themeColors.brand }]}>⚙</Text>
@@ -423,7 +423,7 @@ export default function TaskHomeScreen() {
             <Image source={require('@/assets/images/jules-logo.png')} style={styles.landingLogo} />
             <Text style={[styles.initialLoadingTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
             <Text style={[styles.initialLoadingText, { color: themeColors.textSecondary }]}>{t('apiKeyStartHint')}</Text>
-            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: themeColors.brand }]} onPress={() => router.push('/settings')}>
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: themeColors.brand }]} onPress={() => router.push('/settings' as any)}>
               <Text style={styles.primaryButtonText}>{t('configureApiKey')}</Text>
             </TouchableOpacity>
           </View>
