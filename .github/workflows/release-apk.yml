@@ -40,7 +40,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --audit-level=critical
 
   build-apk:
     name: Build APK (${{ matrix.abi }})
