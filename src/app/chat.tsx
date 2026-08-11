@@ -193,6 +193,7 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [selectedImage, setSelectedImage] = useState<ImageAttachment | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [pollingTrigger, setPollingTrigger] = useState(0);
   const [isApproving, setIsApproving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activitiesNextPageToken, setActivitiesNextPageToken] = useState<string | undefined>();
@@ -298,6 +299,7 @@ export default function ChatScreen() {
         if (disposed) return;
         setSession(sessionResult);
         mergeActivities(activityResult.activities);
+        setPollingTrigger(prev => prev + 1);
         if (!hasLoadedOlderActivities) {
           setActivitiesNextPageToken(activityResult.nextPageToken);
         }
@@ -329,7 +331,7 @@ export default function ChatScreen() {
       stopPolling();
       appStateSubscription.remove();
     };
-  }, [apiKey, hasLoadedOlderActivities, mergeActivities, sessionId, t]);
+  }, [apiKey, hasLoadedOlderActivities, mergeActivities, sessionId, t, pollingTrigger]);
 
   const handleSend = async () => {
     const prompt = inputText.trim();
@@ -338,7 +340,6 @@ export default function ChatScreen() {
       setChatError(t('noApiKeySaved'));
       return;
     }
-    if (isTerminalState(session?.state)) return;
     if (!sessionId && (!sourceId || !startingBranch)) {
       setChatError(t('chooseSourceBranchBeforeStart'));
       return;
@@ -385,6 +386,7 @@ export default function ChatScreen() {
         ]);
         setSession(sessionResult);
         mergeActivities(activityResult.activities);
+        setPollingTrigger(prev => prev + 1);
       }
     } catch (error) {
       setTimeline(current => current.filter(item => item.id !== optimisticId));
@@ -453,7 +455,7 @@ export default function ChatScreen() {
   const waitingForPlan = activeState === 'AWAITING_PLAN_APPROVAL';
   const waitingForFeedback = activeState === 'AWAITING_USER_FEEDBACK';
   const terminal = isTerminalState(activeState);
-  const canSend = Boolean((inputText.trim() || selectedImage) && apiKey && (sessionId || (sourceId && startingBranch)) && !isSending && !terminal);
+  const canSend = Boolean((inputText.trim() || selectedImage) && apiKey && (sessionId || (sourceId && startingBranch)) && !isSending);
 
   const handlePickImage = async () => {
     try {
@@ -530,15 +532,6 @@ export default function ChatScreen() {
     return () => clearTimeout(scrollTimer);
   }, [terminal]);
 
-  const handleStartFollowUp = () => {
-    router.replace({
-      pathname: '/',
-      params: {
-        sourceId: session?.sourceContext?.source,
-        startingBranch: session?.sourceContext?.githubRepoContext?.startingBranch,
-      },
-    });
-  };
 
   const handleOpenExternalLink = async (url: string) => {
     if (!isTrustedPullRequestUrl(url)) {
@@ -813,7 +806,7 @@ export default function ChatScreen() {
         />
 
         {isTimelineScrollable ? (
-          <View style={[styles.scrollControls, terminal ? styles.scrollControlsWithTerminalDock : styles.scrollControlsWithComposer]}>
+          <View style={[styles.scrollControls, styles.scrollControlsWithComposer]}>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={t('scrollToTop')}
@@ -850,22 +843,6 @@ export default function ChatScreen() {
           </View>
         ) : null}
 
-        {terminal ? (
-          <View style={[styles.terminalDock, { backgroundColor: themeColors.topBar, borderTopColor: themeColors.topBarBorder }]}>
-            <View style={styles.terminalDockCopy}>
-              <Text style={[styles.terminalDockTitle, { color: themeColors.text }]}>{activeState === 'COMPLETED' ? t('sessionEnded') : t('taskIncomplete')}</Text>
-              <Text style={[styles.terminalDockText, { color: themeColors.textSecondary }]}>{activeState === 'COMPLETED' ? t('continueSameRepository') : t('retrySameRepository')}</Text>
-            </View>
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={activeState === 'COMPLETED' ? t('startFollowUp') : t('restartTask')}
-              style={[styles.terminalActionButton, { backgroundColor: themeColors.brand }]}
-              onPress={handleStartFollowUp}
-            >
-              <Text style={styles.terminalActionButtonText}>{activeState === 'COMPLETED' ? t('startFollowUp') : t('restartTask')}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
           <View style={[styles.composerContainer, { backgroundColor: themeColors.topBar, borderTopColor: themeColors.topBarBorder }]}>
             {selectedImage && (
               <View style={styles.imagePreviewContainer}>
@@ -910,7 +887,6 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
