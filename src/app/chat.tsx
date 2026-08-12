@@ -372,6 +372,9 @@ export default function ChatScreen() {
           sourceId as string,
           startingBranch as string,
           prompt || 'Analyze image input',
+          {
+            image: imagePayload,
+          },
         );
         const nextSessionId = createdSession.id || createdSession.name.split('/').pop();
         if (!nextSessionId) throw new Error(t('missingSessionId'));
@@ -462,7 +465,7 @@ export default function ChatScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         base64: true,
-        quality: 0.8,
+        quality: 0.7,
       });
 
       if (!result.canceled && result.assets[0]) {

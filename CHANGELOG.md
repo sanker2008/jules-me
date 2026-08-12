@@ -2,6 +2,13 @@
 
 All notable changes to JulesMe are documented in this file.
 
+## [1.1.6] - 2026-08-12
+
+### Added
+
+- Embedded Base64 Data URI formatting for image attachments sent to Jules API.
+- Intelligent client-side image compression (quality 0.7) for efficient payload size.
+
 ## [1.1.5] - 2026-08-11
 
 ### Added

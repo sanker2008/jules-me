@@ -256,6 +256,19 @@ export function getSession(apiKey: string, sessionId: string): Promise<Session> 
   return request<Session>(`/sessions/${getResourceId(sessionId, 'session')}`, apiKey);
 }
 
+export function formatPromptWithImage(
+  prompt: string,
+  image?: { data: string; mimeType: string },
+): string {
+  if (!image || !image.data) {
+    return prompt;
+  }
+  const cleanData = image.data.replace(/\s/g, '');
+  const dataUri = `data:${image.mimeType};base64,${cleanData}`;
+  const imageAttachmentText = `[User Attached Image]\n${dataUri}`;
+  return prompt ? `${prompt}\n\n${imageAttachmentText}` : imageAttachmentText;
+}
+
 export function createSession(
   apiKey: string,
   source: string,
@@ -269,15 +282,16 @@ export function createSession(
   } = {},
 ): Promise<Session> {
   const { requirePlanApproval = true, automationMode, title, image } = options;
+  const finalPrompt = formatPromptWithImage(initialPrompt, image);
+
   return request<Session>('/sessions', apiKey, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      prompt: initialPrompt,
+      prompt: finalPrompt,
       requirePlanApproval,
       ...(automationMode ? { automationMode } : {}),
       ...(title ? { title } : {}),
-      ...(image ? { image } : {}),
       sourceContext: {
         source,
         githubRepoContext: { startingBranch },
@@ -292,10 +306,12 @@ export async function sendMessageToJules(
   message: string,
   image?: { data: string; mimeType: string },
 ): Promise<void> {
+  const finalPrompt = formatPromptWithImage(message, image);
+
   await request<void>(`/sessions/${getResourceId(sessionId, 'session')}:sendMessage`, apiKey, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: message, ...(image ? { image } : {}) }),
+    body: JSON.stringify({ prompt: finalPrompt }),
   });
 }
 

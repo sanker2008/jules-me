@@ -2,7 +2,7 @@
   "name": "julesme",
   "author": "San",
   "main": "expo-router/entry",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "dependencies": {
     "@expo/ui": "~57.0.6",
     "expo": "~57.0.6",
@@ -46,7 +46,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "tsx --test test/jules-guards.test.ts"
+    "test": "tsx --test test/jules-guards.test.ts test/api-format.test.ts"
   },
   "overrides": {
     "send": "^0.19.0",
