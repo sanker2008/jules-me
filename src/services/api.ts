@@ -331,6 +331,30 @@ export async function pollActivities(
   };
 }
 
+export async function getAllActivities(
+  apiKey: string,
+  sessionId: string,
+  maxPages = 10,
+) {
+  let accumulated: Activity[] = [];
+  let pageToken: string | undefined;
+  let pageCount = 0;
+
+  do {
+    const result = await pollActivities(apiKey, sessionId, pageToken);
+    if (result.activities?.length) {
+      accumulated = accumulated.concat(result.activities);
+    }
+    pageToken = result.nextPageToken;
+    pageCount += 1;
+  } while (pageToken && pageCount < maxPages);
+
+  return {
+    activities: accumulated,
+    nextPageToken: pageToken,
+  };
+}
+
 export function getActivity(
   apiKey: string,
   sessionId: string,
@@ -345,3 +369,4 @@ export async function approvePlan(apiKey: string, sessionId: string): Promise<vo
     headers: { 'Content-Type': 'application/json' },
   });
 }
+

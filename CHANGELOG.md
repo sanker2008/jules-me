@@ -2,12 +2,21 @@
 
 All notable changes to JulesMe are documented in this file.
 
-## [1.1.6] - 2026-08-12
+## [1.1.7] - 2026-08-27
 
 ### Added
 
-- Embedded Base64 Data URI formatting for image attachments sent to Jules API.
-- Intelligent client-side image compression (quality 0.7) for efficient payload size.
+- **Syntax-Colored Git Diff Viewer**: Unidiff patches are rendered line-by-line with color highlighting (`+` green, `-` red, `@@` hunk headers) and a 1-tap "Copy Diff" button with clipboard confirmation.
+- **Image Fullscreen Lightbox Modal**: Tap any image in chat bubbles, task summaries, or artifacts to inspect full-resolution screenshots with zoom/dismissal.
+- **Quick Action Prompt Chips**: Contextual quick action pills above the composer ("Fix error", "Add tests", "Optimize & refactor", "Explain logic") for effortless mobile input.
+- **1-Tap Message & Output Copy**: Added instant copy actions for agent responses and command output logs.
+- **Real-Time Session Search**: Search and filter sessions on the home screen by prompt, title, or repository name.
+- **Multi-Page Sync & Image Parsing**: Added `getAllActivities` multi-page activity synchronization and inline image attachment parsing.
+
+### Fixed
+
+- Resolved session entry view positioning to automatically display and scroll to the latest conversation rather than the first message.
+- Removed unwanted scroll-to-top behavior for completed and failed session states.
 
 ## [1.1.5] - 2026-08-11
 

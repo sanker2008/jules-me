@@ -96,3 +96,41 @@ export function createImageAttachment(candidate: ImageCandidate): ImageAttachmen
     },
   };
 }
+
+export interface ParsedMessageContent {
+  text: string;
+  images: string[];
+}
+
+export function parseMessageContent(raw?: string): ParsedMessageContent {
+  if (!raw) {
+    return { text: '', images: [] };
+  }
+
+  const images: string[] = [];
+  const imageRegex = /data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=]+/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = imageRegex.exec(raw)) !== null) {
+    if (!images.includes(match[0])) {
+      images.push(match[0]);
+    }
+  }
+
+  const cleanedText = raw
+    .replace(/!\[[^\]]*\]\(data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=]+\)/g, '')
+    .replace(/(?:\[User Attached Image\]\s*)?data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=]+/g, '')
+    .replace(/\[User Attached Image\]/g, '')
+    .replace(/\[Image Attached\]/g, '')
+    .trim();
+
+  return {
+    text: cleanedText,
+    images,
+  };
+}
+
+export function cleanPromptDisplay(prompt?: string): string {
+  if (!prompt) return '';
+  return parseMessageContent(prompt).text;
+}

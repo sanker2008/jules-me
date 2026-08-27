@@ -6,7 +6,9 @@ import {
   Image,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +16,8 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -21,6 +25,7 @@ import {
   approvePlan,
   Artifact,
   createSession,
+  getAllActivities,
   getSession,
   JulesApiError,
   pollActivities,
@@ -31,9 +36,11 @@ import { createTranslator, useAppLanguage } from '../i18n';
 import type { Translator } from '../i18n';
 import { useTheme } from '../hooks/use-theme';
 import {
+  cleanPromptDisplay,
   createImageAttachment,
   getSingleRouteParam,
   isTrustedPullRequestUrl,
+  parseMessageContent,
 } from '../utils/jules-guards';
 import type { ImageAttachment, ImageAttachmentResult } from '../utils/jules-guards';
 import { getApiKey } from '../utils/secure-store';
@@ -45,6 +52,7 @@ interface TimelineItem {
   activityId?: string;
   kind: TimelineKind;
   text?: string;
+  images?: string[];
   title?: string;
   timestamp: string;
   plan?: NonNullable<Activity['planGenerated']>['plan'];
@@ -118,10 +126,22 @@ function activityToTimelineItem(activity: Activity, t: Translator): TimelineItem
   };
 
   if (activity.userMessaged) {
-    return { ...base, kind: 'user', text: activity.userMessaged.userMessage };
+    const parsed = parseMessageContent(activity.userMessaged.userMessage);
+    return {
+      ...base,
+      kind: 'user',
+      text: parsed.text,
+      images: parsed.images.length > 0 ? parsed.images : undefined,
+    };
   }
   if (activity.agentMessaged) {
-    return { ...base, kind: 'agent', text: activity.agentMessaged.agentMessage };
+    const parsed = parseMessageContent(activity.agentMessaged.agentMessage);
+    return {
+      ...base,
+      kind: 'agent',
+      text: parsed.text,
+      images: parsed.images.length > 0 ? parsed.images : undefined,
+    };
   }
   if (activity.planGenerated) {
     return { ...base, kind: 'plan', plan: activity.planGenerated.plan, title: t('planGenerated') };
@@ -130,11 +150,13 @@ function activityToTimelineItem(activity: Activity, t: Translator): TimelineItem
     return { ...base, kind: 'approved', text: t('planApproved') };
   }
   if (activity.progressUpdated) {
+    const parsed = parseMessageContent(activity.progressUpdated.description);
     return {
       ...base,
       kind: 'progress',
       title: activity.progressUpdated.title,
-      text: activity.progressUpdated.description,
+      text: parsed.text,
+      images: parsed.images.length > 0 ? parsed.images : undefined,
     };
   }
   if (activity.sessionCompleted) {
@@ -202,12 +224,17 @@ export default function ChatScreen() {
   const [chatError, setChatError] = useState<string | null>(null);
   const [expandedArtifacts, setExpandedArtifacts] = useState<Set<string>>(new Set());
   const [expandedPlanSteps, setExpandedPlanSteps] = useState<Set<string>>(new Set());
+  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
+  const [copiedArtifactId, setCopiedArtifactId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isTimelineScrollable, setIsTimelineScrollable] = useState(false);
   const [scrollPosition, setScrollPosition] = useState<'top' | 'middle' | 'bottom'>('top');
   const flatListRef = useRef<FlatList<TimelineItem>>(null);
   const optimisticMessageSequence = useRef(0);
   const timelineContentHeight = useRef(0);
   const timelineViewportHeight = useRef(0);
+  const hasInitialScrolled = useRef(false);
+  const isNearBottomRef = useRef(true);
 
   const updateTimelineScrollability = useCallback(() => {
     const scrollable = timelineContentHeight.current > timelineViewportHeight.current + 8;
@@ -217,12 +244,11 @@ export default function ChatScreen() {
 
   const handleTimelineScroll = useCallback((offsetY: number, viewportHeight: number, contentHeight: number) => {
     const threshold = 8;
-    const nextPosition = offsetY <= threshold
-      ? 'top'
-      : offsetY + viewportHeight >= contentHeight - threshold
-        ? 'bottom'
-        : 'middle';
+    const isAtTop = offsetY <= threshold;
+    const isAtBottom = offsetY + viewportHeight >= contentHeight - threshold;
+    const nextPosition = isAtTop ? 'top' : isAtBottom ? 'bottom' : 'middle';
 
+    isNearBottomRef.current = offsetY + viewportHeight >= contentHeight - 48;
     setScrollPosition(current => current === nextPosition ? current : nextPosition);
   }, []);
 
@@ -266,12 +292,29 @@ export default function ChatScreen() {
   }, [t]);
 
   useEffect(() => {
+    hasInitialScrolled.current = false;
+    isNearBottomRef.current = true;
     const timer = setTimeout(() => {
       setActivitiesNextPageToken(undefined);
       setHasLoadedOlderActivities(false);
     }, 0);
     return () => clearTimeout(timer);
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!hasInitialScrolled.current && timeline.length > 0) {
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+        hasInitialScrolled.current = true;
+      }, 50);
+      return () => clearTimeout(timer);
+    } else if (hasInitialScrolled.current && isNearBottomRef.current && timeline.length > 0) {
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [timeline.length]);
 
   useEffect(() => {
     if (!apiKey || !sessionId) return;
@@ -294,7 +337,7 @@ export default function ChatScreen() {
       try {
         const [sessionResult, activityResult] = await Promise.all([
           getSession(apiKey, sessionId),
-          pollActivities(apiKey, sessionId),
+          getAllActivities(apiKey, sessionId),
         ]);
         if (disposed) return;
         setSession(sessionResult);
@@ -347,15 +390,12 @@ export default function ChatScreen() {
 
     const optimisticId = `local-${++optimisticMessageSequence.current}`;
     const imagePayload = selectedImage ? { data: selectedImage.data, mimeType: selectedImage.mimeType } : undefined;
-    let optimisticText = prompt;
-    if (selectedImage) {
-      optimisticText = optimisticText ? `${optimisticText}\n[Image Attached]` : '[Image Attached]';
-    }
 
     const optimisticItem: TimelineItem = {
       id: optimisticId,
       kind: 'user',
-      text: optimisticText,
+      text: prompt || undefined,
+      images: selectedImage ? [selectedImage.uri] : undefined,
       timestamp: new Date().toISOString(),
     };
 
@@ -364,6 +404,11 @@ export default function ChatScreen() {
     setSelectedImage(null);
     setIsSending(true);
     setChatError(null);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    isNearBottomRef.current = true;
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 50);
 
     try {
       if (!sessionId) {
@@ -404,6 +449,7 @@ export default function ChatScreen() {
 
     setIsApproving(true);
     setChatError(null);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     try {
       await approvePlan(apiKey, sessionId);
       const [sessionResult, activityResult] = await Promise.all([
@@ -525,15 +571,7 @@ export default function ChatScreen() {
           : themeColors.statusActiveText,
   };
 
-  useEffect(() => {
-    if (!terminal) return;
 
-    const scrollTimer = setTimeout(() => {
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-    }, 0);
-
-    return () => clearTimeout(scrollTimer);
-  }, [terminal]);
 
 
   const handleOpenExternalLink = async (url: string) => {
@@ -549,24 +587,91 @@ export default function ChatScreen() {
     }
   };
 
+  const handleCopyText = async (id: string, text: string, type: 'artifact' | 'message') => {
+    try {
+      await Clipboard.setStringAsync(text);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (type === 'artifact') {
+        setCopiedArtifactId(id);
+        setTimeout(() => setCopiedArtifactId(null), 2000);
+      } else {
+        setCopiedMessageId(id);
+        setTimeout(() => setCopiedMessageId(null), 2000);
+      }
+    } catch (err) {
+      console.error('Clipboard copy error:', err);
+    }
+  };
+
+  const renderDiffViewer = (diffText: string) => {
+    const lines = diffText.split('\n');
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator style={styles.diffScrollView}>
+        <View style={styles.diffContainer}>
+          {lines.map((line, idx) => {
+            let lineStyle = styles.diffLineNormal;
+            let textStyle = styles.diffTextNormal;
+
+            if (line.startsWith('+') && !line.startsWith('+++')) {
+              lineStyle = styles.diffLineAdded;
+              textStyle = styles.diffTextAdded;
+            } else if (line.startsWith('-') && !line.startsWith('---')) {
+              lineStyle = styles.diffLineDeleted;
+              textStyle = styles.diffTextDeleted;
+            } else if (line.startsWith('@@')) {
+              lineStyle = styles.diffLineHunk;
+              textStyle = styles.diffTextHunk;
+            } else if (line.startsWith('diff --git') || line.startsWith('index') || line.startsWith('---') || line.startsWith('+++')) {
+              lineStyle = styles.diffLineHeader;
+              textStyle = styles.diffTextHeader;
+            }
+
+            return (
+              <View key={`diff-line-${idx}`} style={[styles.diffLine, lineStyle]}>
+                <Text selectable style={[styles.diffText, textStyle]}>
+                  {line || ' '}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
+    );
+  };
+
   const renderArtifact = (artifact: Artifact, itemId: string, index: number) => {
     const artifactId = `${itemId}-${index}`;
     const isExpanded = expandedArtifacts.has(artifactId);
+    const isCopied = copiedArtifactId === artifactId;
 
     if (artifact.changeSet?.gitPatch) {
       const patch = artifact.changeSet.gitPatch;
       return (
         <View key={artifactId} style={[styles.artifactCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
-          <TouchableOpacity accessibilityRole="button" onPress={() => toggleArtifact(artifactId)} style={styles.artifactHeader}>
-            <View style={styles.artifactHeaderCopy}>
+          <View style={styles.artifactHeader}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => toggleArtifact(artifactId)} style={styles.artifactHeaderCopy}>
               <Text style={[styles.artifactTitle, { color: themeColors.text }]}>{t('codeChanges')}</Text>
               <Text style={[styles.artifactMeta, { color: themeColors.textSecondary }]}>{patch.suggestedCommitMessage || 'Git patch'}</Text>
+            </TouchableOpacity>
+            <View style={styles.artifactActionRow}>
+              {patch.unidiffPatch ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={isCopied ? t('diffCopied') : t('copyDiff')}
+                  onPress={() => handleCopyText(artifactId, patch.unidiffPatch || '', 'artifact')}
+                  style={[styles.artifactPillButton, { backgroundColor: themeColors.brandSubtle }]}
+                >
+                  <Text style={[styles.artifactPillText, { color: themeColors.brand }]}>
+                    {isCopied ? `✓ ${t('diffCopied')}` : `📋 ${t('copyDiff')}`}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity accessibilityRole="button" onPress={() => toggleArtifact(artifactId)} style={[styles.artifactPillButton, { backgroundColor: themeColors.brandSubtle }]}>
+                <Text style={[styles.artifactPillText, { color: themeColors.brand }]}>{isExpanded ? t('collapse') : t('viewDiff')}</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={[styles.artifactToggle, { color: themeColors.brand }]}>{isExpanded ? t('collapse') : t('viewDiff')}</Text>
-          </TouchableOpacity>
-          {isExpanded && patch.unidiffPatch ? (
-            <Text selectable style={styles.codeBlock}>{patch.unidiffPatch}</Text>
-          ) : null}
+          </View>
+          {isExpanded && patch.unidiffPatch ? renderDiffViewer(patch.unidiffPatch) : null}
         </View>
       );
     }
@@ -574,15 +679,31 @@ export default function ChatScreen() {
     if (artifact.bashOutput) {
       return (
         <View key={artifactId} style={[styles.artifactCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
-          <TouchableOpacity accessibilityRole="button" onPress={() => toggleArtifact(artifactId)} style={styles.artifactHeader}>
-            <View style={styles.artifactHeaderCopy}>
+          <View style={styles.artifactHeader}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => toggleArtifact(artifactId)} style={styles.artifactHeaderCopy}>
               <Text style={[styles.artifactTitle, { color: themeColors.text }]}>{t('commandOutput')}</Text>
               <Text style={[styles.artifactMeta, { color: themeColors.textSecondary }]} numberOfLines={1}>{artifact.bashOutput.command}</Text>
+            </TouchableOpacity>
+            <View style={styles.artifactActionRow}>
+              <Text style={[styles.exitCode, artifact.bashOutput.exitCode === 0 ? styles.exitCodeSuccess : styles.exitCodeError]}>
+                {artifact.bashOutput.exitCode === 0 ? t('success') : t('exitCode', artifact.bashOutput.exitCode)}
+              </Text>
+              {artifact.bashOutput.output ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => handleCopyText(artifactId, artifact.bashOutput?.output || '', 'artifact')}
+                  style={[styles.artifactPillButton, { backgroundColor: themeColors.brandSubtle }]}
+                >
+                  <Text style={[styles.artifactPillText, { color: themeColors.brand }]}>
+                    {isCopied ? `✓ ${t('messageCopied')}` : `📋 ${t('copyMessage')}`}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity accessibilityRole="button" onPress={() => toggleArtifact(artifactId)} style={[styles.artifactPillButton, { backgroundColor: themeColors.brandSubtle }]}>
+                <Text style={[styles.artifactPillText, { color: themeColors.brand }]}>{isExpanded ? t('collapse') : t('view')}</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={[styles.exitCode, artifact.bashOutput.exitCode === 0 ? styles.exitCodeSuccess : styles.exitCodeError]}>
-              {artifact.bashOutput.exitCode === 0 ? t('success') : t('exitCode', artifact.bashOutput.exitCode)}
-            </Text>
-          </TouchableOpacity>
+          </View>
           {isExpanded ? <Text selectable style={styles.codeBlock}>{artifact.bashOutput.output || t('noOutput')}</Text> : null}
         </View>
       );
@@ -590,16 +711,19 @@ export default function ChatScreen() {
 
     if (artifact.media) {
       const isImage = artifact.media.mimeType.startsWith('image/');
+      const mediaUri = `data:${artifact.media.mimeType};base64,${artifact.media.data}`;
       return (
         <View key={artifactId} style={[styles.artifactCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
           <Text style={[styles.artifactTitle, { color: themeColors.text }]}>{isImage ? t('generatedImage') : t('generatedMedia')}</Text>
           <Text style={[styles.artifactMeta, { color: themeColors.textSecondary }]}>{artifact.media.mimeType}</Text>
           {isImage ? (
-            <Image
-              style={styles.artifactImage}
-              resizeMode="contain"
-              source={{ uri: `data:${artifact.media.mimeType};base64,${artifact.media.data}` }}
-            />
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewImageUri(mediaUri)}>
+              <Image
+                style={styles.artifactImage}
+                resizeMode="contain"
+                source={{ uri: mediaUri }}
+              />
+            </TouchableOpacity>
           ) : null}
         </View>
       );
@@ -611,16 +735,47 @@ export default function ChatScreen() {
   const renderItem = ({ item }: { item: TimelineItem }) => {
     if (item.kind === 'user' || item.kind === 'agent') {
       const isUser = item.kind === 'user';
+      const isMessageCopied = copiedMessageId === item.id;
+
       return (
         <View style={[styles.messageBubble, isUser ? [styles.userBubble, { backgroundColor: themeColors.brand }] : [styles.agentBubble, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]]}>
-          <Text style={[styles.messageText, isUser ? styles.userText : [styles.agentText, { color: themeColors.text }]]}>{item.text}</Text>
+          {item.images?.map((imageUri, index) => (
+            <TouchableOpacity
+              key={`${item.id}-img-${index}`}
+              activeOpacity={0.85}
+              onPress={() => setPreviewImageUri(imageUri)}
+            >
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.messageImage}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          ))}
+          {item.text ? (
+            <Text selectable style={[styles.messageText, isUser ? styles.userText : [styles.agentText, { color: themeColors.text }]]}>{item.text}</Text>
+          ) : null}
           {item.artifacts?.map((artifact, index) => renderArtifact(artifact, item.id, index))}
-          <Text
-            accessibilityLabel={t('activityTime', formatActivityTime(item.timestamp, t))}
-            style={[styles.messageTime, isUser ? styles.userMessageTime : [styles.agentMessageTime, { color: themeColors.textSecondary }]]}
-          >
-            {formatActivityTime(item.timestamp, t)}
-          </Text>
+          <View style={styles.messageFooterRow}>
+            {!isUser && item.text ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={isMessageCopied ? t('messageCopied') : t('copyMessage')}
+                onPress={() => handleCopyText(item.id, item.text || '', 'message')}
+                style={styles.messageCopyButton}
+              >
+                <Text style={[styles.messageCopyText, { color: isMessageCopied ? themeColors.brand : themeColors.textSecondary }]}>
+                  {isMessageCopied ? `✓ ${t('messageCopied')}` : `📋 ${t('copyMessage')}`}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            <Text
+              accessibilityLabel={t('activityTime', formatActivityTime(item.timestamp, t))}
+              style={[styles.messageTime, isUser ? styles.userMessageTime : [styles.agentMessageTime, { color: themeColors.textSecondary }]]}
+            >
+              {formatActivityTime(item.timestamp, t)}
+            </Text>
+          </View>
         </View>
       );
     }
@@ -690,6 +845,19 @@ export default function ChatScreen() {
           <Text style={[styles.eventTime, { color: themeColors.textSecondary }]}>{formatActivityTime(item.timestamp, t)}</Text>
         </View>
         {item.title ? <Text style={[styles.eventTitle, { color: themeColors.text }]}>{item.title}</Text> : null}
+        {item.images?.map((imageUri, index) => (
+          <TouchableOpacity
+            key={`${item.id}-event-img-${index}`}
+            activeOpacity={0.85}
+            onPress={() => setPreviewImageUri(imageUri)}
+          >
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+        ))}
         {item.text ? <Text style={[styles.eventText, { color: themeColors.textSecondary }]}>{item.text}</Text> : null}
         {item.artifacts?.map((artifact, index) => renderArtifact(artifact, item.id, index))}
       </View>
@@ -720,7 +888,7 @@ export default function ChatScreen() {
               {displaySource} · {startingBranch || session?.sourceContext?.githubRepoContext?.startingBranch || t('selectedBranch')}
             </Text>
             <Text style={[styles.headerTitle, { color: themeColors.text }]} numberOfLines={1}>
-              {session?.title || session?.prompt || t('workbench')}
+              {session?.title || cleanPromptDisplay(session?.prompt) || t('workbench')}
             </Text>
           </View>
           <View style={[styles.statusChip, { backgroundColor: headerStatusStyle.bg }]}>
@@ -745,6 +913,10 @@ export default function ChatScreen() {
           onContentSizeChange={(_, height) => {
             timelineContentHeight.current = height;
             updateTimelineScrollability();
+            if (!hasInitialScrolled.current && timeline.length > 0 && height > 0) {
+              hasInitialScrolled.current = true;
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
           }}
           onLayout={event => {
             timelineViewportHeight.current = event.nativeEvent.layout.height;
@@ -760,12 +932,31 @@ export default function ChatScreen() {
           scrollEventThrottle={16}
           ListHeaderComponent={(
             <View style={styles.listHeader}>
-              {session?.prompt ? (
-                <View style={[styles.taskSummary, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}>
-                  <Text style={[styles.taskSummaryLabel, { color: themeColors.brand }]}>{t('taskGoal')}</Text>
-                  <Text style={[styles.taskSummaryText, { color: themeColors.text }]}>{session.prompt}</Text>
-                </View>
-              ) : null}
+              {session?.prompt ? (() => {
+                const parsed = parseMessageContent(session.prompt);
+                if (!parsed.text && parsed.images.length === 0) return null;
+                return (
+                  <View style={[styles.taskSummary, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}>
+                    <Text style={[styles.taskSummaryLabel, { color: themeColors.brand }]}>{t('taskGoal')}</Text>
+                    {parsed.images.map((imageUri, index) => (
+                      <TouchableOpacity
+                        key={`task-summary-img-${index}`}
+                        activeOpacity={0.85}
+                        onPress={() => setPreviewImageUri(imageUri)}
+                      >
+                        <Image
+                          source={{ uri: imageUri }}
+                          style={styles.taskSummaryImage}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                    {parsed.text ? (
+                      <Text style={[styles.taskSummaryText, { color: themeColors.text }]}>{parsed.text}</Text>
+                    ) : null}
+                  </View>
+                );
+              })() : null}
 
               {terminal ? (
                 <View style={[styles.deliveryCard, activeState === 'FAILED' && styles.deliveryCardFailed]}>
@@ -836,6 +1027,27 @@ export default function ChatScreen() {
         {chatError ? (
           <View style={styles.errorNotice}>
             <Text style={styles.errorNoticeText}>{chatError}</Text>
+            <View style={styles.errorNoticeActions}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('retry')}
+                onPress={() => {
+                  setChatError(null);
+                  setPollingTrigger(p => p + 1);
+                }}
+                style={styles.errorNoticeBtn}
+              >
+                <Text style={styles.errorNoticeBtnText}>{t('retry')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('dismiss')}
+                onPress={() => setChatError(null)}
+                style={styles.errorNoticeClose}
+              >
+                <Text style={styles.errorNoticeCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : null}
 
@@ -847,6 +1059,52 @@ export default function ChatScreen() {
         ) : null}
 
           <View style={[styles.composerContainer, { backgroundColor: themeColors.topBar, borderTopColor: themeColors.topBarBorder }]}>
+            {!inputText && !selectedImage ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.quickPromptsScroll}
+                keyboardShouldPersistTaps="handled"
+              >
+                <TouchableOpacity
+                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setInputText('检查并修复这个报错：');
+                  }}
+                >
+                  <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>🐛 {t('promptFixBugChip')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setInputText('为刚才涉及的核心业务逻辑补充单元测试');
+                  }}
+                >
+                  <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>🧪 {t('promptAddTestsChip')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setInputText('优化这部分代码的性能和可读性，进行精简重构');
+                  }}
+                >
+                  <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>⚡ {t('promptRefactorChip')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setInputText('请详细解释这段代码的核心逻辑和执行流程');
+                  }}
+                >
+                  <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>💡 {t('promptExplainCodeChip')}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            ) : null}
+
             {selectedImage && (
               <View style={styles.imagePreviewContainer}>
                 <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} />
@@ -890,8 +1148,35 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
           </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+
+        <Modal
+          visible={Boolean(previewImageUri)}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPreviewImageUri(null)}
+        >
+          <View style={styles.lightboxBackdrop}>
+            <TouchableOpacity
+              style={styles.lightboxCloseButton}
+              onPress={() => setPreviewImageUri(null)}
+              accessibilityRole="button"
+              accessibilityLabel={t('closePreview')}
+            >
+              <Text style={styles.lightboxCloseButtonText}>✕</Text>
+            </TouchableOpacity>
+            {previewImageUri ? (
+              <TouchableOpacity activeOpacity={1} style={styles.lightboxImageWrapper} onPress={() => setPreviewImageUri(null)}>
+                <Image
+                  source={{ uri: previewImageUri }}
+                  style={styles.lightboxImage}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </Modal>
+      </SafeAreaView>
   );
 }
 
@@ -926,6 +1211,8 @@ const styles = StyleSheet.create({
   messageBubble: { maxWidth: '89%', borderRadius: 18, padding: 13, marginVertical: 2 },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 5 },
   agentBubble: { alignSelf: 'flex-start', borderWidth: 1, borderBottomLeftRadius: 5 },
+  messageImage: { width: 220, height: 160, borderRadius: 12, marginBottom: 8, backgroundColor: 'rgba(0,0,0,0.06)' },
+  taskSummaryImage: { width: '100%', height: 140, borderRadius: 10, marginTop: 8, marginBottom: 4, backgroundColor: 'rgba(0,0,0,0.06)' },
   messageText: { fontSize: 15, lineHeight: 22 },
   userText: { color: '#FFFFFF' },
   agentText: { fontSize: 15, lineHeight: 22 },
@@ -975,8 +1262,13 @@ const styles = StyleSheet.create({
   artifactImage: { width: '100%', height: 180, borderRadius: 8, marginTop: 10, backgroundColor: '#F4F2FA' },
   historyButton: { minHeight: 42, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
   historyButtonText: { fontSize: 13, fontWeight: '800' },
-  errorNotice: { paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#FFF4F3', borderTopWidth: 1, borderTopColor: '#FFD7D2' },
-  errorNoticeText: { color: '#AA3027', fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  errorNotice: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#FFF4F3', borderTopWidth: 1, borderTopColor: '#FFD7D2', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  errorNoticeText: { color: '#AA3027', fontSize: 12, lineHeight: 17, flex: 1 },
+  errorNoticeActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  errorNoticeBtn: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  errorNoticeBtnText: { color: '#B42318', fontSize: 11, fontWeight: '700' },
+  errorNoticeClose: { padding: 4 },
+  errorNoticeCloseText: { color: '#AA3027', fontSize: 13, fontWeight: '700' },
   workingIndicator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 9 },
   workingIndicatorText: { fontSize: 12, fontWeight: '700' },
   composerContainer: { borderTopWidth: 1, flexDirection: 'column' },
@@ -997,4 +1289,32 @@ const styles = StyleSheet.create({
   terminalDockText: { fontSize: 11, lineHeight: 16, marginTop: 1 },
   terminalActionButton: { minWidth: 116, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 13 },
   terminalActionButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  messageFooterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 7 },
+  messageCopyButton: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: 'rgba(0,0,0,0.04)' },
+  messageCopyText: { fontSize: 11, fontWeight: '700' },
+  artifactActionRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  artifactPillButton: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  artifactPillText: { fontSize: 11, fontWeight: '800' },
+  diffScrollView: { marginTop: 10, borderRadius: 8, overflow: 'hidden', backgroundColor: '#181622', maxHeight: 360 },
+  diffContainer: { paddingVertical: 8, minWidth: '100%' },
+  diffLine: { paddingHorizontal: 10, paddingVertical: 2, flexDirection: 'row' },
+  diffLineAdded: { backgroundColor: 'rgba(34, 197, 94, 0.16)' },
+  diffLineDeleted: { backgroundColor: 'rgba(239, 68, 68, 0.16)' },
+  diffLineHunk: { backgroundColor: 'rgba(168, 85, 247, 0.22)' },
+  diffLineHeader: { backgroundColor: 'rgba(255, 255, 255, 0.06)' },
+  diffLineNormal: {},
+  diffText: { fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), fontSize: 11, lineHeight: 17 },
+  diffTextAdded: { color: '#4ADE80' },
+  diffTextDeleted: { color: '#F87171' },
+  diffTextHunk: { color: '#C084FC', fontWeight: '700' },
+  diffTextHeader: { color: '#93C5FD', fontWeight: '700' },
+  diffTextNormal: { color: '#E2E8F0' },
+  quickPromptsScroll: { paddingHorizontal: 13, paddingTop: 10, paddingBottom: 2, gap: 8 },
+  quickPromptChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1 },
+  quickPromptText: { fontSize: 12, fontWeight: '700' },
+  lightboxBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', alignItems: 'center', justifyContent: 'center' },
+  lightboxCloseButton: { position: 'absolute', top: Platform.OS === 'ios' ? 54 : 32, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  lightboxCloseButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  lightboxImageWrapper: { width: '100%', height: '80%', alignItems: 'center', justifyContent: 'center' },
+  lightboxImage: { width: '92%', height: '100%' },
 });

@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   createSession,
@@ -25,7 +26,7 @@ import {
 import { createTranslator, useAppLanguage } from '../i18n';
 import type { Translator } from '../i18n';
 import { useTheme } from '../hooks/use-theme';
-import { getSingleRouteParam } from '../utils/jules-guards';
+import { cleanPromptDisplay, getSingleRouteParam } from '../utils/jules-guards';
 import { getApiKey } from '../utils/secure-store';
 
 type PickerMode = 'source' | 'branch' | null;
@@ -132,6 +133,7 @@ export default function TaskHomeScreen() {
   const [taskPrompt, setTaskPrompt] = useState('');
   const [requirePlanApproval, setRequirePlanApproval] = useState(true);
   const [autoCreatePr, setAutoCreatePr] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(false);
   const [hasLoadedWorkspace, setHasLoadedWorkspace] = useState(false);
@@ -150,11 +152,22 @@ export default function TaskHomeScreen() {
     return Array.from(new Set(defaultBranch ? [defaultBranch, ...branches] : branches));
   }, [selectedSource]);
 
+  const filteredSessions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return recentSessions;
+    return recentSessions.filter(session => {
+      const title = (session.title || '').toLowerCase();
+      const prompt = (session.prompt || '').toLowerCase();
+      const source = (session.sourceContext?.source || '').toLowerCase();
+      return title.includes(query) || prompt.includes(query) || source.includes(query);
+    });
+  }, [recentSessions, searchQuery]);
+
   const sessionsByPriority = useMemo(() => ({
-    needsAttention: recentSessions.filter(isActionRequired),
-    active: recentSessions.filter(isActive),
-    recent: recentSessions.filter(session => !isActionRequired(session) && !isActive(session)),
-  }), [recentSessions]);
+    needsAttention: filteredSessions.filter(isActionRequired),
+    active: filteredSessions.filter(isActive),
+    recent: filteredSessions.filter(session => !isActionRequired(session) && !isActive(session)),
+  }), [filteredSessions]);
 
   const fetchWorkspace = useCallback(async (apiKey: string) => {
     if (!apiKey) return;
@@ -280,6 +293,7 @@ export default function TaskHomeScreen() {
     setSelectedSourceName(source.name);
     setSelectedBranch(defaultBranch || source.githubRepo?.branches?.[0]?.displayName || null);
     setPickerMode(null);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleStartTask = async () => {
@@ -297,6 +311,7 @@ export default function TaskHomeScreen() {
 
     setIsStartingSession(true);
     setWorkspaceError(null);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const session = await createSession(
         savedApiKey,
@@ -330,7 +345,7 @@ export default function TaskHomeScreen() {
   const renderSession = (session: Session) => {
     const status = getSessionStatus(session.state, t);
     const source = session.sourceContext?.source?.split('/').pop() || 'Jules';
-    const title = session.title || session.prompt || t('untitledTask');
+    const title = session.title || cleanPromptDisplay(session.prompt) || t('untitledTask');
 
     const statusStyle = {
       attention: { bg: themeColors.statusAttentionBg, text: themeColors.statusAttentionText },
@@ -581,6 +596,33 @@ export default function TaskHomeScreen() {
               </View>
             ) : null}
 
+            {recentSessions.length > 0 ? (
+              <View style={[styles.searchBarContainer, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+                <Text style={styles.searchIcon}>🔍</Text>
+                <TextInput
+                  accessibilityLabel={t('searchSessions')}
+                  style={[styles.searchInput, { color: themeColors.text }]}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder={t('searchPlaceholder')}
+                  placeholderTextColor={themeColors.textMuted}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+                {searchQuery ? (
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('clearForm')} onPress={() => setSearchQuery('')} style={styles.searchClearButton}>
+                    <Text style={[styles.searchClearText, { color: themeColors.textSecondary }]}>✕</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+
+            {searchQuery && filteredSessions.length === 0 ? (
+              <View style={styles.emptySearchContainer}>
+                <Text style={[styles.emptySearchText, { color: themeColors.textSecondary }]}>{t('noMatchingSessions')}</Text>
+              </View>
+            ) : null}
+
             {sessionsByPriority.needsAttention.length > 0 ? (
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: themeColors.text }]}>{t('needsAttention')}</Text>
@@ -827,6 +869,13 @@ const styles = StyleSheet.create({
   statusPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
   statusText: { fontSize: 11, fontWeight: '800' },
   emptyText: { fontSize: 13, lineHeight: 20, paddingVertical: 6 },
+  searchBarContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, minHeight: 44, marginVertical: 4 },
+  searchIcon: { fontSize: 14, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 14, paddingVertical: 8 },
+  searchClearButton: { padding: 6 },
+  searchClearText: { fontSize: 13, fontWeight: '700' },
+  emptySearchContainer: { paddingVertical: 24, alignItems: 'center', justifyContent: 'center' },
+  emptySearchText: { fontSize: 14, fontWeight: '600' },
   loadMoreButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 12, marginTop: 2 },
   loadMoreText: { fontSize: 13, fontWeight: '800' },
   sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
