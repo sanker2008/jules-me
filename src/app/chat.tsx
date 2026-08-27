@@ -372,6 +372,7 @@ export default function ChatScreen() {
           sourceId as string,
           startingBranch as string,
           prompt || 'Analyze image input',
+          { image: imagePayload }
         );
         const nextSessionId = createdSession.id || createdSession.name.split('/').pop();
         if (!nextSessionId) throw new Error(t('missingSessionId'));
