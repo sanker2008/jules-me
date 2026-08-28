@@ -5,61 +5,89 @@
 ---
 
 ## 目录
-1. [产品定位与商业模式](#一产品定位与商业模式)
+1. [产品定位、开源策略与商业模式](#一产品定位开源策略与商业模式)
 2. [功能特权矩阵 (Free vs Pro)](#二功能特权矩阵-free-vs-pro)
-3. [核心模块技术架构设计](#三核心模块技术架构设计)
+3. [双套餐定价与价格锚定设计](#三双套餐定价与价格锚定设计)
+4. [核心模块技术架构设计](#四核心模块技术架构设计)
    - [模块 1：License 授权与本地鉴权体系](#模块-1license-授权与本地鉴权体系)
    - [模块 2：设置页激活 UI 与 Paywall 拦截弹窗](#模块-2设置页激活-ui-与-paywall-拦截弹窗)
    - [模块 3：官方国内免翻墙高速直连通道](#模块-3官方国内免翻墙高速直连通道)
    - [模块 4：自定义 Prompt 快捷指令库管理器](#模块-4自定义-prompt-快捷指令库管理器)
    - [模块 5：Cloudflare R2 高清多图图床](#模块-5cloudflare-r2-高清多图图床)
-4. [支付与自动化发卡系统 (Webhook)](#四支付与自动化发卡系统-webhook)
-5. [Google Play 合规与安全防刷](#五google-play-合规与安全防刷)
-6. [分阶段开发路线图 (Roadmap)](#六分阶段开发路线图-roadmap)
+5. [支付与自动化发卡系统 (Webhook)](#五支付与自动化发卡系统-webhook)
+6. [Google Play 合规与安全防刷](#六google-play-合规与安全防刷)
+7. [分阶段开发路线图 (Roadmap)](#七分阶段开发路线图-roadmap)
 
 ---
 
-## 一、产品定位与商业模式
+## 一、产品定位、开源策略与商业模式
 
-* **产品定位**：面向专业开发者的移动端 Google Jules Agent 生产力客户端。
-* **收费模式**：**买断制（Lifetime License）**，降低开发者决策门槛。
-  * **国内定价**：**￥39 元** 永久买断（支持 1~3 台个人设备）。
-  * **海外定价**：**$5.99 ~ $8.99** 永久买断。
-* **支付渠道**：
-  * 国内：爱发电 (Aifadian) / 面包多 / 发卡平台（微信支付 / 支付宝）。
-  * 海外：Lemon Squeezy / Gumroad（信用卡 / PayPal / Apple Pay）。
+### 1.1 产品定位
+面向专业开发者的移动端 Google Jules Agent 生产力客户端，让开发者在手机上随时随地指挥 Jules 改 Bug、写单测、提 PR。
+
+### 1.2 开源策略：Open-Core（开源核心 + Pro 商业增值）
+* **客户端代码完全开源**：
+  * **解决信任痛点**：消除程序员对 Google Jules API Key 泄露的安全顾虑，证明 App 绝不暗中记录或窃取凭证。
+  * **GitHub 流量红利**：通过开源社区自传播（Star、Issue、PR、V2EX、Twitter、掘金）获取天然精准流量。
+* **商业护城河**：
+  * 官方提供**开箱即用、免翻墙的高速直连通道**与云服务，普通开发者无需耗费数小时折腾服务器与域名，花小额费用直接享受极致便利。
 
 ---
 
 ## 二、功能特权矩阵 (Free vs Pro)
 
-| 功能项 | 免费版 (Free) | 🌟 Pro 版 (￥39 买断) |
-| :--- | :---: | :---: |
-| **基础 Jules 任务与会话执行** | ✅ 完整支持 | ✅ 完整支持 |
-| **彩色 Git Diff 语法高亮** | ✅ 完整支持 | ✅ 完整支持 |
-| **图片全屏高清预览 (Lightbox)** | ✅ 完整支持 | ✅ 完整支持 |
-| **网络连接通道** | 官方直连 (需科学上网) / 自填私有节点 | **🚀 官方专属国内免翻高速通道 (零配置秒连)** |
-| **快捷 Prompt 指令库** | 4 个固定默认指令 | **自定义增删改查、排序、导入导出专属 Prompt** |
-| **图片附件上传** | 本地压缩 Base64 嵌入 (1~2 张) | **Cloudflare R2 极速高清多图直传 + 历史记录** |
-| **代码 Diff 导出** | 剪贴板复制 | **一键导出为 `.patch` / `.diff` 文件并分享** |
-| **尊贵身份标识** | 无 | **设置页与主页 Pro 尊贵标识与优先支持** |
+| 功能项 | 免费版 (Free) | ☕ Pro 月度体验版 (￥9.9) | 👑 Pro 终身买断版 (￥39) |
+| :--- | :---: | :---: | :---: |
+| **基础 Jules 任务与会话执行** | ✅ 完整支持 | ✅ 完整支持 | ✅ 完整支持 |
+| **彩色 Git Diff 语法高亮** | ✅ 完整支持 | ✅ 完整支持 | ✅ 完整支持 |
+| **图片全屏高清预览 (Lightbox)** | ✅ 完整支持 | ✅ 完整支持 | ✅ 完整支持 |
+| **网络连接通道** | 官方直连 (需科学上网) / 自填私有节点 | **🚀 官方免翻高速通道 (30天)** | **🚀 官方免翻高速通道 (永久)** |
+| **快捷 Prompt 指令库** | 4 个固定默认指令 | **自定义增删改查与排序** | **自定义增删改查与排序** |
+| **图片附件上传** | 本地压缩 Base64 嵌入 | **Cloudflare R2 高清直传** | **Cloudflare R2 高清直传** |
+| **代码 Diff 导出** | 剪贴板复制 | **导出 `.patch` 文件并分享** | **导出 `.patch` 文件并分享** |
+| **多设备支持** | 不限 | 1~3 台设备 | 1~3 台设备 |
+| **有效期限** | 永久免费 | 30 天 | **终身永久，包含所有未来大更新** |
 
 ---
 
-## 三、核心模块技术架构设计
+## 三、双套餐定价与价格锚定设计
+
+采用独立软件最具转化率的 **“月度体验 + 终身买断” 价格锚定组合**：
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    🌟 解锁 JulesMe Pro                      │
+├──────────────────────────────┬──────────────────────────────┤
+│      ☕ 月度体验版           │      👑 终身买断版 (推荐)    │
+├──────────────────────────────┼──────────────────────────────┤
+│         ￥9.9 / 30 天        │       ￥39 永久 (限时特惠)   │
+│         ($1.99 / mo)         │       ($6.99 ~ $8.99)        │
+│                              │                              │
+│ • 适合短期项目尝鲜           │ • 终身享受全部后续大版本更新 │
+│ • 30 天官方免翻高速通道      │ • 永久官方免翻高速直连通道   │
+│ • 自定义 Prompt 快捷指令库   │ • 自定义 Prompt 快捷指令库   │
+│ • 随时体验，零决策压力       │ • 仅需 4 个月月费即可永久拥有│
+├──────────────────────────────┼──────────────────────────────┤
+│        [ 选择月度 ]          │        [ 立即买断 ]          │
+└──────────────────────────────┴──────────────────────────────┘
+```
+
+---
+
+## 四、核心模块技术架构设计
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
 │                       JulesMe App                           │
 ├─────────────────────────────────────────────────────────────┤
 │  [UI Layer]                                                 │
-│   ├── ProPaywallModal (拦截弹窗)                            │
+│   ├── ProPaywallModal (双套餐对比与拦截弹窗)                │
 │   ├── SettingsScreen (License 激活 / 网络通道切换)           │
 │   └── PromptManagerModal (自定义指令库管理)                  │
 ├─────────────────────────────────────────────────────────────┤
 │  [State & Business Layer]                                   │
 │   ├── useProStatus (全局 Pro 状态 Hook)                     │
-│   ├── LicenseEngine (Ed25519 离线签名 / 联网校验器)          │
+│   ├── LicenseEngine (校验 expiresAt / 永久或月度)           │
 │   └── Dynamic Api Routing (根据 Pro 权限路由 Base URL)       │
 ├─────────────────────────────────────────────────────────────┤
 │  [Storage Layer]                                            │
@@ -73,13 +101,14 @@
 
 #### 1.1 数据结构定义 (`src/types/pro.ts`)
 ```typescript
-export type LicenseTier = 'free' | 'pro_lifetime' | 'pro_yearly';
+export type LicenseTier = 'free' | 'pro_monthly' | 'pro_lifetime';
 
 export interface LicensePayload {
   key: string;            // 授权码例如: JULES-PRO-8899-ABCD-EFGH
   email?: string;          // 购买者邮箱
+  tier: LicenseTier;       // 'pro_monthly' | 'pro_lifetime'
   issuedAt: number;        // 发卡时间戳
-  expiresAt?: number | null; // 过期时间戳 (null 表示永久)
+  expiresAt: number | null; // 过期时间戳 (null 表示永久买断)
   maxDevices: number;      // 允许激活的最大设备数 (默认 3)
 }
 
@@ -93,11 +122,10 @@ export interface ProState {
 ```
 
 #### 1.2 License 校验逻辑 (`src/utils/license.ts`)
-支持 **轻量在线校验** 与 **离线非对称签名校验** 双重保障：
 ```typescript
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import type { ProState, LicensePayload } from '../types/pro';
+import type { ProState, LicensePayload, LicenseTier } from '../types/pro';
 
 const PRO_STORAGE_KEY = 'julesme_pro_license_v1';
 const LICENSE_VERIFY_ENDPOINT = 'https://api.julesme.com/v1/license/verify';
@@ -115,7 +143,7 @@ export async function getOrCreateDeviceId(): Promise<string> {
 }
 
 /**
- * 从本地安全存储读取 Pro 状态
+ * 从本地安全存储读取 Pro 状态（含月度过期校验）
  */
 export async function loadSavedProState(): Promise<ProState> {
   const deviceId = await getOrCreateDeviceId();
@@ -124,7 +152,8 @@ export async function loadSavedProState(): Promise<ProState> {
     if (!raw) return { isPro: false, tier: 'free', deviceId };
     
     const parsed: ProState = JSON.parse(raw);
-    // 检查有效期
+    
+    // 如果是月度套餐且已过期，自动回退为免费版
     if (parsed.license?.expiresAt && parsed.license.expiresAt < Date.now()) {
       await SecureStore.deleteItemAsync(PRO_STORAGE_KEY);
       return { isPro: false, tier: 'free', deviceId };
@@ -136,7 +165,7 @@ export async function loadSavedProState(): Promise<ProState> {
 }
 
 /**
- * 向服务器验证并激活 License Key
+ * 向服务器验证并激活 License Key (支持月度与买断)
  */
 export async function activateLicenseKey(licenseKey: string): Promise<{ success: boolean; message?: string; state?: ProState }> {
   const cleanKey = licenseKey.trim().toUpperCase();
@@ -154,10 +183,11 @@ export async function activateLicenseKey(licenseKey: string): Promise<{ success:
       return { success: false, message: data.message || '无效或已被禁用的授权码' };
     }
 
+    const payload: LicensePayload = data.license;
     const proState: ProState = {
       isPro: true,
-      tier: 'pro_lifetime',
-      license: data.license,
+      tier: payload.tier || (payload.expiresAt ? 'pro_monthly' : 'pro_lifetime'),
+      license: payload,
       deviceId,
       activatedAt: Date.now(),
     };
@@ -171,7 +201,6 @@ export async function activateLicenseKey(licenseKey: string): Promise<{ success:
 ```
 
 #### 1.3 全局 Hook (`src/hooks/use-pro.ts`)
-通过 React Context 提供响应式的 Pro 状态：
 ```typescript
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { loadSavedProState, activateLicenseKey, ProState } from '../utils/license';
@@ -205,7 +234,6 @@ export const ProProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deactivate = async () => {
-    // 清除本地激活态
     setProState({ isPro: false, tier: 'free', deviceId: proState.deviceId });
   };
 
@@ -228,18 +256,17 @@ export const usePro = () => {
 ### 模块 2：设置页激活 UI 与 Paywall 拦截弹窗
 
 #### 2.1 设置页 (`src/app/settings.tsx`) UI 改造
-在【设置】中增加 **🌟 JulesMe Pro 状态与激活卡片**：
 * **未激活状态**：
-  * 显示金色醒目的“升级到 JulesMe Pro”卡片，列出三大特权（免翻墙高速直连 / 自定义 Prompt 库 / 高清大图直传）。
+  * 显示金色 Pro 升级卡片，展示【￥9.9 体验 / ￥39 买断】双套餐。
   * 提供 `[ 输入授权码激活 ]` 按钮。
 * **已激活状态**：
-  * 显示 `🌟 Pro 永久授权` 徽章。
-  * 展示授权邮箱 / Key 脱敏展示（如 `JULES-PRO-****-8899`）。
-  * 提供 `[ 换绑 / 解绑设备 ]` 操作。
+  * 显示 `🌟 Pro 永久授权` 或 `☕ Pro 月度体验（剩 X 天）` 徽章。
+  * 展示脱敏 Key（如 `JULES-PRO-****-8899`）。
+  * 提供 `[ 解绑设备 ]` 功能。
 
 #### 2.2 Paywall 拦截弹窗 (`src/components/pro-paywall-modal.tsx`)
-当免费用户在主页或聊天页点击 Pro 专属功能时弹出：
-* 包含：特权介绍轮播、输入激活码入口、购买链接（跳往浏览器官网）。
+当免费用户触发 Pro 特权（如切换免翻直连通道或管理 Prompt）时弹出：
+* 包含双套餐购买选项卡片、激活码输入框与购买官网链接。
 
 ---
 
@@ -265,7 +292,6 @@ export function resolveBaseUrl(channel: NetworkChannel, customUrl?: string, isPr
 ```
 
 #### 3.2 官方 Cloudflare Worker 反向代理源码 (`server/relay-worker.js`)
-部署在 `api.julesme.com` 的无状态透明反代：
 ```javascript
 export default {
   async fetch(request, env) {
@@ -280,7 +306,6 @@ export default {
     }
 
     const url = new URL(request.url);
-    // 重写目标为 Google 官方域名
     url.hostname = 'jules.googleapis.com';
 
     const forwardRequest = new Request(url.toString(), {
@@ -311,41 +336,39 @@ export default {
 ```typescript
 export interface PromptTemplate {
   id: string;
-  title: string;        // 标题，例如 "按 Google 规范重构"
-  icon?: string;        // Emoji 图标，例如 "⚡"
+  title: string;        // 标题例如 "按 Google 规范重构"
+  icon?: string;        // Emoji 图标例如 "⚡"
   content: string;      // 填入输入框的 Prompt 内容
-  isDefault?: boolean;  // 是否系统默认预设
+  isDefault?: boolean;  // 是否系统预设
   order: number;
 }
 ```
 
-#### 4.2 功能交互
-* 聊天输入框上方快捷气泡支持滑动查看。
-* Pro 用户可在气泡最右侧点击 `[ ⚙️ 管理指令 ]` 呼出管理弹窗：
-  * 支持 **新建指令**、**修改内容**、**删除**、**上移/下移排序**。
-  * 数据保存在本地 `AsyncStorage` / `SecureStore` 中。
+#### 4.2 交互
+* 输入框上方快捷气泡最右侧增加 `[ ⚙️ 管理指令 ]`（Pro 专属）。
+* 点击呼出管理页面：支持新建指令、编辑内容、拖拽/上移下移排序、删除。
 
 ---
 
 ### 模块 5：Cloudflare R2 高清多图图床
 
-#### 5.1 架构
-* 免费版：继续使用客户端 Base64 嵌入（无需服务器）。
-* Pro 版：选图后自动直传至 Cloudflare R2，在 Prompt 中引用图片公开 URL（`https://img.julesme.com/xxx.webp`），省去超长 Base64 字符，支持发高清多图。
+* 免费版：客户端 Base64 压缩（零服务器）。
+* Pro 版：图片直传 Cloudflare R2，Prompt 内引用精简 URL（`https://img.julesme.com/xxx.webp`），支持高清大图与多图发送。
 
 ---
 
-## 四、支付与自动化发卡系统 (Webhook)
+## 五、支付与自动化发卡系统 (Webhook)
 
 ```text
-[用户付款 (爱发电 / LemonSqueezy)]
-               │
-               ▼ Webhook
-[Cloudflare License Worker (api.julesme.com)]
-               │
-               ├─ 1. 生成唯一 License Key (UUID + Hash)
-               ├─ 2. 存入 Cloudflare D1 或 KV 数据库 (绑定邮箱)
-               └─ 3. 自动发送 Key 到用户邮箱 / 页面展示
+[用户付款 (爱发电 ￥9.9 / ￥39 或 LemonSqueezy)]
+                         │
+                         ▼ Webhook
+          [Cloudflare License Worker]
+                         │
+        ├─ 1. 生成唯一 License Key (UUID)
+        ├─ 2. 计算过期时间 (月度: +30天, 买断: null)
+        ├─ 3. 存入 Cloudflare KV (绑定邮箱)
+        └─ 4. 发送 Key 到用户邮箱 / 页面展示
 ```
 
 ### Cloudflare KV 存储数据格式：
@@ -356,7 +379,8 @@ export interface PromptTemplate {
   "key": "JULES-PRO-XXXX-XXXX",
   "email": "developer@example.com",
   "status": "active",
-  "tier": "pro_lifetime",
+  "tier": "pro_monthly",
+  "expiresAt": 1742500000000,
   "devices": ["android-1740000-abcd"],
   "maxDevices": 3,
   "createdAt": 1740000000000
@@ -365,24 +389,23 @@ export interface PromptTemplate {
 
 ---
 
-## 五、Google Play 合规与安全防刷
+## 六、Google Play 合规与安全防刷
 
 1. **Google Play 避坑准则**：
    * **严禁**：App 内严禁出现“*点击跳转微信/支付宝购买*”或“*绕过 Google Play 付费*”的外链直付诱导按钮。
    * **允许**：App 内仅保留 **“输入授权码 (License Key) 激活”** 与 **“访问官方网站/社区论坛”**（参考 Termius / Microsoft Office / Obsidian 模式）。
 2. **防盗刷机制**：
    * 限制单个 License Key 最多绑定 **3 台设备**（记录 `deviceId`）。
-   * 若超出限制，提示“设备数超限，请在原设备解绑或联系作者换绑”。
 
 ---
 
-## 六、分阶段开发路线图 (Roadmap)
+## 七、分阶段开发路线图 (Roadmap)
 
 ### 阶段一：Pro 核心底座与鉴权（预计 1~2 天）
-* [ ] 创建 `src/types/pro.ts` 与 `src/utils/license.ts`。
+* [ ] 创建 `src/types/pro.ts` 与 `src/utils/license.ts`（支持月度/买断）。
 * [ ] 编写 `src/hooks/use-pro.ts` 全局 Context Provider。
 * [ ] 改造 `src/app/settings.tsx`，加入 Pro 激活卡片与 License Key 输入弹窗。
-* [ ] 实现 `src/components/pro-paywall-modal.tsx` 拦截弹窗。
+* [ ] 实现 `src/components/pro-paywall-modal.tsx` 双套餐拦截弹窗。
 
 ### 阶段二：国内免翻墙高速直连（预计 1 天）
 * [ ] 部署 Cloudflare Relay Worker 并绑定 `api.julesme.com`。
@@ -395,6 +418,6 @@ export interface PromptTemplate {
 * [ ] 将自定义 Prompt 映射到聊天页输入框上方的快捷气泡中。
 
 ### 阶段四：支付发卡与上线（预计 1 天）
-* [ ] 配置爱发电 / Lemon Squeezy 售卖链接。
+* [ ] 在爱发电 / 面包多 / Lemon Squeezy 配置【￥9.9 月度体验】与【￥39 终身买断】售卖链接。
 * [ ] 编写发卡 Webhook Worker 脚本并完成联调。
 * [ ] 编写用户激活说明文档。
