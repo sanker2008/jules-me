@@ -2,6 +2,21 @@
 
 All notable changes to JulesMe are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Pro Client Foundation**: Added encrypted local license state, monthly expiry fallback, a global Pro provider, a settings activation card, and a dual-plan native paywall sheet.
+- **Pro License Regression Coverage**: Added unit tests for expired monthly licenses, perpetual licenses, malformed cached state, and license-key masking.
+
+### Documentation
+
+- Recorded the Phase 1 implementation boundary, verification evidence, and server-side prerequisites in `docs/PRO_IMPLEMENTATION_STATUS.md`.
+
+### Fixed
+
+- Synchronized `package-lock.json` with the Expo 57 dependency tree so GitHub Actions can complete its reproducible `npm ci` install.
+
 ## [1.1.7] - 2026-08-27
 
 ### Added

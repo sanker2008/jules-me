@@ -48,7 +48,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "tsx --test test/jules-guards.test.ts test/api-format.test.ts"
+    "test": "tsx --test test/jules-guards.test.ts test/api-format.test.ts test/license-state.test.ts"
   },
   "overrides": {
     "send": "^0.19.0",

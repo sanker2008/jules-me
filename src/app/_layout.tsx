@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { ProProvider } from '@/hooks/use-pro';
 import { AppThemeProvider, useAppTheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -23,7 +24,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppThemeProvider>
-        <RootNavigator />
+        <ProProvider>
+          <RootNavigator />
+        </ProProvider>
       </AppThemeProvider>
     </SafeAreaProvider>
   );

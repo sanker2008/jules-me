@@ -13,22 +13,33 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ProPaywallModal } from '../components/pro-paywall-modal';
+import { usePro } from '../hooks/use-pro';
 import { createTranslator, getLanguageName, getThemeName, languageOptions, useAppLanguage } from '../i18n';
 import { themeOptions, useAppTheme } from '../theme';
 import { useTheme } from '../hooks/use-theme';
 import { getApiKey, saveApiKey } from '../utils/secure-store';
+import { maskLicenseKey } from '../utils/license-state';
+
+function getRemainingProDays(expiresAt: number | null | undefined): number {
+  if (typeof expiresAt !== 'number') return 0;
+  return Math.max(1, Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000)));
+}
 
 export default function SettingsScreen() {
   const router = useRouter();
   const themeColors = useTheme();
   const { preference: languagePreference, setPreference: setLanguagePreference, language } = useAppLanguage();
-  const { preference: themePreference, setPreference: setThemePreference } = useAppTheme();
+  const { theme, preference: themePreference, setPreference: setThemePreference } = useAppTheme();
+  const { activate, deactivate, isLoading: isProLoading, proState } = usePro();
   const t = useMemo(() => createTranslator(language), [language]);
 
   const [draftApiKey, setDraftApiKey] = useState('');
   const [savedStatus, setSavedStatus] = useState<string | null>(null);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [showProPaywall, setShowProPaywall] = useState(false);
+  const [proStatus, setProStatus] = useState<string | null>(null);
 
   const appVersion = Constants.expoConfig?.version ?? '1.0.1';
   const buildNumber = Constants.expoConfig?.ios?.buildNumber
@@ -57,6 +68,18 @@ export default function SettingsScreen() {
     setDraftApiKey('');
   };
 
+  const handleDeactivatePro = async () => {
+    await deactivate();
+    setProStatus(t('proDeactivated'));
+    setTimeout(() => setProStatus(null), 2600);
+  };
+
+  const monthlyDaysRemaining = getRemainingProDays(proState.license?.expiresAt);
+  const isProActive = !isProLoading && proState.isPro;
+  const proCardColors = theme === 'dark'
+    ? { backgroundColor: isProActive ? '#1F1A38' : '#35270F', borderColor: isProActive ? '#4A3F85' : '#86611D' }
+    : { backgroundColor: isProActive ? '#F5F2FF' : '#FFF8E8', borderColor: isProActive ? '#D9D1FF' : '#F4D68A' };
+
   return (
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: themeColors.background }]}>
       <View style={[styles.topBar, { backgroundColor: themeColors.topBar, borderBottomColor: themeColors.topBarBorder }]}>
@@ -78,6 +101,49 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={[styles.card, styles.proCard, proCardColors]}>
+          {isProLoading ? (
+            <View style={styles.proLoading}>
+              <Text selectable style={[styles.cardTitle, { color: themeColors.text }]}>{t('proTitle')}</Text>
+              <Text selectable style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('proLoading')}</Text>
+            </View>
+          ) : isProActive ? (
+            <>
+              <View style={styles.proHeader}>
+                <View style={[styles.proBadge, { backgroundColor: themeColors.brand }]}>
+                  <Text style={styles.proBadgeText}>{proState.tier === 'pro_lifetime' ? t('proLifetimeActive') : t('proMonthlyActive', monthlyDaysRemaining)}</Text>
+                </View>
+                <Text selectable style={[styles.proKey, { color: themeColors.textSecondary }]}>{maskLicenseKey(proState.license?.key ?? '')}</Text>
+              </View>
+              <Text selectable style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('proActiveDescription')}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('proDeactivateThisDevice')}
+                onPress={() => void handleDeactivatePro()}
+                style={[styles.proSecondaryButton, { borderColor: themeColors.brand }]}
+              >
+                <Text style={[styles.proSecondaryButtonText, { color: themeColors.brand }]}>{t('proDeactivateThisDevice')}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.proHeader}>
+                <Text selectable style={[styles.cardTitle, { color: themeColors.text }]}>{t('proTitle')}</Text>
+                <Text selectable style={[styles.proPriceAnchor, { color: themeColors.brand }]}>{t('proPriceAnchor')}</Text>
+              </View>
+              <Text selectable style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{proStatus || t('proFreeDescription')}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('proActivateLicense')}
+                onPress={() => setShowProPaywall(true)}
+                style={[styles.proPrimaryButton, { backgroundColor: themeColors.brand }]}
+              >
+                <Text style={styles.saveButtonText}>{t('proActivateLicense')}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
         {/* API Key Section */}
         <View style={[styles.card, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
           <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
@@ -245,6 +311,13 @@ export default function SettingsScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <ProPaywallModal
+        visible={showProPaywall}
+        onDismiss={() => setShowProPaywall(false)}
+        onActivate={activate}
+        t={t}
+      />
     </SafeAreaView>
   );
 }
@@ -299,6 +372,56 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     padding: 20,
+  },
+  proCard: {
+    gap: 10,
+    boxShadow: '0 4px 12px rgba(72, 46, 10, 0.12)',
+  },
+  proHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  proLoading: {
+    gap: 4,
+  },
+  proPriceAnchor: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  proBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  proBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  proKey: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  proPrimaryButton: {
+    minHeight: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  proSecondaryButton: {
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  proSecondaryButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   cardTitle: {
     fontSize: 18,

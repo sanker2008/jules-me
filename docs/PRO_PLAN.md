@@ -402,10 +402,12 @@ export interface PromptTemplate {
 ## 七、分阶段开发路线图 (Roadmap)
 
 ### 阶段一：Pro 核心底座与鉴权（预计 1~2 天）
-* [ ] 创建 `src/types/pro.ts` 与 `src/utils/license.ts`（支持月度/买断）。
-* [ ] 编写 `src/hooks/use-pro.ts` 全局 Context Provider。
-* [ ] 改造 `src/app/settings.tsx`，加入 Pro 激活卡片与 License Key 输入弹窗。
-* [ ] 实现 `src/components/pro-paywall-modal.tsx` 双套餐拦截弹窗。
+* [x] 创建 `src/types/pro.ts` 与 `src/utils/license.ts`（支持月度/买断）。
+* [x] 编写 `src/hooks/use-pro.tsx` 全局 Context Provider。
+* [x] 改造 `src/app/settings.tsx`，加入 Pro 激活卡片与 License Key 输入弹窗。
+* [x] 实现 `src/components/pro-paywall-modal.tsx` 双套餐拦截弹窗。
+
+> 客户端完成范围、验证记录与服务端待办见 [`PRO_IMPLEMENTATION_STATUS.md`](./PRO_IMPLEMENTATION_STATUS.md)。
 
 ### 阶段二：国内免翻墙高速直连（预计 1 天）
 * [ ] 部署 Cloudflare Relay Worker 并绑定 `api.julesme.com`。

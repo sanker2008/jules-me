@@ -46,7 +46,10 @@ JulesMe 采用 **Open-Core（开源核心 + Pro 商业增值）** 模式，为�
 * 📸 **Cloudflare R2 高清多图直传图床**
 * 📦 **Git Diff 代码补丁一键导出为 `.patch` 文件并分享**
 
-详细技术设计与发卡系统设计见规划文档：👉 [**`docs/PRO_PLAN.md`**](./docs/PRO_PLAN.md)
+当前已完成 **阶段一客户端底座**：本地安全授权状态、月度到期回退、设置页激活入口与双套餐激活弹层。Relay、R2、支付发卡和设备名额的服务端强制校验仍待部署，不能视为已上线能力。
+
+详细技术设计与发卡系统设计见规划文档：👉 [**`docs/PRO_PLAN.md`**](./docs/PRO_PLAN.md)  
+当前实现边界、验证记录与服务端前置条件：👉 [**`docs/PRO_IMPLEMENTATION_STATUS.md`**](./docs/PRO_IMPLEMENTATION_STATUS.md)
 
 ---
 
@@ -81,6 +84,9 @@ npx expo start
 ```bash
 # 运行单元测试
 npm test
+
+# 如果 WSL 的 TEMP/TMP 指向 Windows 挂载路径，请使用 Linux 临时目录
+TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test
 
 # TypeScript 类型检查
 npx tsc --noEmit
