@@ -19,6 +19,11 @@ import { createTranslator, getLanguageName, getThemeName, languageOptions, useAp
 import { themeOptions, useAppTheme } from '../theme';
 import { useTheme } from '../hooks/use-theme';
 import { getApiKey, saveApiKey } from '../utils/secure-store';
+import {
+  IS_PRO_ACTIVATION_AVAILABLE,
+  IS_PRO_PURCHASE_AVAILABLE,
+  PRO_PURCHASE_URL,
+} from '../utils/license';
 import { maskLicenseKey } from '../utils/license-state';
 
 function getRemainingProDays(expiresAt: number | null | undefined): number {
@@ -76,6 +81,13 @@ export default function SettingsScreen() {
 
   const monthlyDaysRemaining = getRemainingProDays(proState.license?.expiresAt);
   const isProActive = !isProLoading && proState.isPro;
+  const isProPurchaseAvailable = Platform.OS === 'web' && IS_PRO_PURCHASE_AVAILABLE;
+  const isProEntryAvailable = IS_PRO_ACTIVATION_AVAILABLE || isProPurchaseAvailable;
+  const proEntryLabel = IS_PRO_ACTIVATION_AVAILABLE
+    ? t('proActivateLicense')
+    : isProPurchaseAvailable
+      ? t('proPurchase')
+      : t('proComingSoonAction');
   const proCardColors = theme === 'dark'
     ? { backgroundColor: isProActive ? '#1F1A38' : '#35270F', borderColor: isProActive ? '#4A3F85' : '#86611D' }
     : { backgroundColor: isProActive ? '#F5F2FF' : '#FFF8E8', borderColor: isProActive ? '#D9D1FF' : '#F4D68A' };
@@ -129,16 +141,29 @@ export default function SettingsScreen() {
             <>
               <View style={styles.proHeader}>
                 <Text selectable style={[styles.cardTitle, { color: themeColors.text }]}>{t('proTitle')}</Text>
-                <Text selectable style={[styles.proPriceAnchor, { color: themeColors.brand }]}>{t('proPriceAnchor')}</Text>
+                <Text selectable style={[styles.proPriceAnchor, { color: themeColors.brand }]}>
+                  {isProEntryAvailable ? t('proPriceAnchor') : t('proComingSoonBadge')}
+                </Text>
               </View>
-              <Text selectable style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{proStatus || t('proFreeDescription')}</Text>
+              <Text selectable style={[styles.cardDescription, { color: themeColors.textSecondary }]}>
+                {proStatus || (isProEntryAvailable ? t('proFreeDescription') : t('proComingSoonDescription'))}
+              </Text>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={t('proActivateLicense')}
-                onPress={() => setShowProPaywall(true)}
-                style={[styles.proPrimaryButton, { backgroundColor: themeColors.brand }]}
+                accessibilityLabel={proEntryLabel}
+                disabled={!isProEntryAvailable}
+                onPress={() => {
+                  if (isProEntryAvailable) setShowProPaywall(true);
+                }}
+                style={[
+                  styles.proPrimaryButton,
+                  { backgroundColor: themeColors.brand },
+                  !isProEntryAvailable && styles.proButtonDisabled,
+                ]}
               >
-                <Text style={styles.saveButtonText}>{t('proActivateLicense')}</Text>
+                <Text style={styles.saveButtonText}>
+                  {proEntryLabel}
+                </Text>
               </TouchableOpacity>
             </>
           )}
@@ -316,6 +341,8 @@ export default function SettingsScreen() {
         visible={showProPaywall}
         onDismiss={() => setShowProPaywall(false)}
         onActivate={activate}
+        activationAvailable={IS_PRO_ACTIVATION_AVAILABLE}
+        purchaseUrl={PRO_PURCHASE_URL}
         t={t}
       />
     </SafeAreaView>
@@ -364,6 +391,9 @@ const styles = StyleSheet.create({
     width: 38,
   },
   scrollContent: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
     padding: 16,
     gap: 16,
     paddingBottom: 40,
@@ -422,6 +452,9 @@ const styles = StyleSheet.create({
   proSecondaryButtonText: {
     fontSize: 13,
     fontWeight: '800',
+  },
+  proButtonDisabled: {
+    opacity: 0.55,
   },
   cardTitle: {
     fontSize: 18,

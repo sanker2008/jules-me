@@ -2,7 +2,7 @@
   "expo": {
     "name": "JulesMe",
     "slug": "julesMe",
-    "version": "1.1.7",
+    "version": "1.1.9",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -18,19 +18,17 @@
     "scheme": "julesme",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "buildNumber": "17"
+      "icon": "./assets/images/icon-ios.png",
+      "buildNumber": "19"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.julesMe",
-      "versionCode": 17
+      "package": "com.sanomni.julesme",
+      "versionCode": 19
     },
     "web": {
       "output": "static",
@@ -47,10 +45,13 @@
         }
       ],
       "expo-secure-store",
+      "./scripts/with-android-release-signing.cjs",
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow JulesMe to access your photos to attach images to tasks."
+          "photosPermission": "Allow JulesMe to access your photos to attach images to tasks.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ]
     ],

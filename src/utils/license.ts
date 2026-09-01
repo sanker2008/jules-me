@@ -1,17 +1,21 @@
 import * as SecureStore from 'expo-secure-store';
 
-import type { LicenseActivationResult, LicensePayload, ProState } from '../types/pro';
+import type { ProState } from '../types/pro';
 import {
+  activateLicenseWithDependencies,
   createFreeProState,
-  DEFAULT_MAX_DEVICES,
-  normalizeLicenseKey,
+  isSafeHttpsUrl,
+  type ProLicenseActivationResult,
   resolveStoredProState,
 } from './license-state';
 
 export const PRO_STORAGE_KEY = 'julesme_pro_license_v1';
 const DEVICE_ID_STORAGE_KEY = 'julesme_device_id_v1';
-export const LICENSE_VERIFY_ENDPOINT = process.env.EXPO_PUBLIC_LICENSE_VERIFY_ENDPOINT?.trim()
-  || 'https://api.julesme.com/v1/license/verify';
+const configuredLicenseEndpoint = process.env.EXPO_PUBLIC_LICENSE_VERIFY_ENDPOINT?.trim();
+export const LICENSE_VERIFY_ENDPOINT = isSafeHttpsUrl(configuredLicenseEndpoint) ? configuredLicenseEndpoint : '';
+export const PRO_PURCHASE_URL = process.env.EXPO_PUBLIC_PRO_PURCHASE_URL?.trim() ?? '';
+export const IS_PRO_ACTIVATION_AVAILABLE = isSafeHttpsUrl(LICENSE_VERIFY_ENDPOINT);
+export const IS_PRO_PURCHASE_AVAILABLE = isSafeHttpsUrl(PRO_PURCHASE_URL);
 
 const isWeb = process.env.EXPO_OS === 'web';
 
@@ -44,14 +48,18 @@ async function removeStoredValue(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key);
 }
 
+async function getOrCreatePersistentDeviceId(): Promise<string> {
+  const savedDeviceId = await getStoredValue(DEVICE_ID_STORAGE_KEY);
+  if (savedDeviceId) return savedDeviceId;
+
+  const deviceId = `${process.env.EXPO_OS ?? 'native'}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  await setStoredValue(DEVICE_ID_STORAGE_KEY, deviceId);
+  return deviceId;
+}
+
 export async function getOrCreateDeviceId(): Promise<string> {
   try {
-    const savedDeviceId = await getStoredValue(DEVICE_ID_STORAGE_KEY);
-    if (savedDeviceId) return savedDeviceId;
-
-    const deviceId = `${process.env.EXPO_OS ?? 'native'}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    await setStoredValue(DEVICE_ID_STORAGE_KEY, deviceId);
-    return deviceId;
+    return await getOrCreatePersistentDeviceId();
   } catch (error) {
     console.warn('Failed to persist the JulesMe device identifier:', error);
     return `native-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -81,89 +89,14 @@ export async function loadSavedProState(): Promise<ProState> {
   }
 }
 
-function parseLicensePayload(value: unknown): LicensePayload | null {
-  if (!value || typeof value !== 'object') return null;
-
-  const license = value as Record<string, unknown>;
-  const expiresAt = license.expiresAt;
-  const maxDevices = license.maxDevices;
-  const tier = license.tier === 'pro_monthly' || license.tier === 'pro_lifetime'
-    ? license.tier
-    : typeof expiresAt === 'number'
-      ? 'pro_monthly'
-      : 'pro_lifetime';
-
-  if (
-    typeof license.key !== 'string'
-    || !normalizeLicenseKey(license.key)
-    || typeof license.issuedAt !== 'number'
-    || !Number.isFinite(license.issuedAt)
-    || (expiresAt !== null && (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)))
-    || (tier === 'pro_monthly' && typeof expiresAt !== 'number')
-    || (tier === 'pro_lifetime' && expiresAt !== null)
-    || (license.email !== undefined && typeof license.email !== 'string')
-    || (maxDevices !== undefined && (typeof maxDevices !== 'number' || !Number.isInteger(maxDevices) || maxDevices <= 0))
-  ) {
-    return null;
-  }
-
-  return {
-    key: normalizeLicenseKey(license.key),
-    ...(typeof license.email === 'string' ? { email: license.email } : {}),
-    tier,
-    issuedAt: license.issuedAt,
-    expiresAt,
-    maxDevices: typeof maxDevices === 'number' ? maxDevices : DEFAULT_MAX_DEVICES,
-  };
-}
-
-async function readResponseBody(response: Response): Promise<Record<string, unknown> | null> {
-  try {
-    const body: unknown = await response.json();
-    return body && typeof body === 'object' ? body as Record<string, unknown> : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function activateLicenseKey(licenseKey: string): Promise<LicenseActivationResult> {
-  const key = normalizeLicenseKey(licenseKey);
-  if (!key) return { success: false, error: 'empty_key' };
-
-  const deviceId = await getOrCreateDeviceId();
-
-  try {
-    const response = await fetch(LICENSE_VERIFY_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, deviceId, platform: process.env.EXPO_OS ?? 'native' }),
-    });
-    const data = await readResponseBody(response);
-
-    if (!response.ok || data?.valid !== true) {
-      const message = typeof data?.message === 'string' ? data.message : undefined;
-      return { success: false, error: 'invalid_license', message };
-    }
-
-    const license = parseLicensePayload(data.license);
-    if (!license) return { success: false, error: 'invalid_response' };
-    if (license.expiresAt !== null && license.expiresAt <= Date.now()) {
-      return { success: false, error: 'expired_license' };
-    }
-
-    const state: ProState = {
-      isPro: true,
-      tier: license.tier,
-      license,
-      deviceId,
-      activatedAt: Date.now(),
-    };
-    await setStoredValue(PRO_STORAGE_KEY, JSON.stringify(state));
-    return { success: true, state };
-  } catch (error) {
-    console.warn('Failed to verify the JulesMe Pro license:', error);
-    return { success: false, error: 'network' };
-  }
+export async function activateLicenseKey(licenseKey: string): Promise<ProLicenseActivationResult> {
+  return activateLicenseWithDependencies(licenseKey, {
+    endpoint: LICENSE_VERIFY_ENDPOINT,
+    fetchImpl: fetch,
+    getDeviceId: getOrCreatePersistentDeviceId,
+    persistState: state => setStoredValue(PRO_STORAGE_KEY, JSON.stringify(state)),
+    platform: process.env.EXPO_OS ?? 'native',
+  });
 }
 
 export async function clearSavedProState(): Promise<void> {

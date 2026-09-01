@@ -13,7 +13,7 @@
 | 本地安全存储与设备标识 | 已完成 | `src/utils/license.ts` |
 | 全局 Pro 状态 | 已完成 | `src/hooks/use-pro.tsx` |
 | 设置页 Pro 卡片与脱敏授权码 | 已完成 | `src/app/settings.tsx` |
-| 双套餐激活底部弹层 | 已完成 | `src/components/pro-paywall-modal.tsx` |
+| 双套餐与激活底部弹层 | 已完成 | `src/components/pro-paywall-modal.tsx` |
 | 简中、繁中、英文文案 | 已完成 | `src/i18n/index.ts` |
 | 授权服务器联调 | 待服务端 | `POST /v1/license/verify` |
 
@@ -21,14 +21,16 @@
 
 - 原生端将授权状态和设备标识写入 `expo-secure-store`；Web 端使用浏览器本地存储。
 - 月度授权在本地到期后自动回退为 Free；结构异常或损坏的缓存不会授予 Pro。
-- 默认验证地址为 `https://api.julesme.com/v1/license/verify`，可用 `EXPO_PUBLIC_LICENSE_VERIFY_ENDPOINT` 在构建时替换。
+- 客户端不再请求未上线的默认域名。只有构建时显式设置有效 HTTPS `EXPO_PUBLIC_LICENSE_VERIFY_ENDPOINT` 才开放激活；未配置时设置页显示“即将上线”的不可用状态。
+- Web 购买入口由 `EXPO_PUBLIC_PRO_PURCHASE_URL` 控制，只接受 HTTPS 地址；未配置时显示“购买入口即将上线”。原生端不打开外部直付链接。
+- 激活请求有 10 秒超时，并分别反馈网络失败、超时、服务响应异常和安全存储失败。
 - 当前“取消本机激活”仅删除本机授权缓存。释放服务端设备名额必须由后续 License Worker 提供经验证的解绑接口。
 
 ### 服务端契约与安全边界
 
 客户端缓存只用于离线显示和功能状态，**不是安全授权边界**。官方中转、R2 上传和设备数量限制必须由服务端再次验证 License Key 与设备标识。
 
-验证接口应返回 `valid: true` 与完整的 `license` 对象，至少包含 `key`、`tier`、`issuedAt`、`expiresAt` 和 `maxDevices`。客户端会拒绝字段缺失、套餐与过期时间不一致或已经到期的数据。
+验证接口应返回 `valid: true` 与完整的 `license` 对象，至少包含 `key`、`tier`、`issuedAt`、`expiresAt` 和 `maxDevices`。返回的 `key` 必须与本次提交值一致；客户端会拒绝字段缺失、套餐与过期时间不一致、设备上限非法、Key 不一致或已经到期的数据，不会推断套餐或补默认设备数。
 
 ## 验证记录
 
@@ -41,6 +43,12 @@
 2026-08-31 已重新生成并校验 npm 锁文件：
 
 - `npm ci --dry-run --ignore-scripts --no-audit --no-fund`：通过，GitHub Actions 所报的 Metro、测试库与平台依赖均已写入 `package-lock.json`。
+
+2026-08-31 Pro 授权加固在 WSL 中通过：
+
+- `test/license-state.test.ts`：13 项通过，覆盖 HTTPS 地址约束、严格响应字段、提交 Key 一致性、网络失败、请求超时、异常响应、存储失败、未配置服务和异常缓存。
+- `npx tsc --noEmit`
+- Pro 相关源文件定向 ESLint 检查
 
 Web 浏览器验收尚未完成：当前工作区的 `node_modules` 混入 Windows 原生二进制，Metro 缺少 Linux `lightningcss` 绑定而返回 HTTP 500。此问题不影响上述类型、单测和 lint 结果；需要在 WSL 中恢复完整的 Linux 依赖后再执行浏览器与真机验收。
 

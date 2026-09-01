@@ -4,10 +4,12 @@ All notable changes to JulesMe are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.9] - 2026-08-31
+
 ### Added
 
 - **Pro Client Foundation**: Added encrypted local license state, monthly expiry fallback, a global Pro provider, a settings activation card, and a dual-plan native paywall sheet.
-- **Pro License Regression Coverage**: Added unit tests for expired monthly licenses, perpetual licenses, malformed cached state, and license-key masking.
+- **Regression Coverage**: Added tests for non-overlapping incremental polling, request timeouts, strict license contracts, release metadata, and Android signing configuration.
 
 ### Documentation
 
@@ -15,7 +17,11 @@ All notable changes to JulesMe are documented in this file.
 
 ### Fixed
 
-- Synchronized `package-lock.json` with the Expo 57 dependency tree so GitHub Actions can complete its reproducible `npm ci` install.
+- Upgraded the Expo 57 dependency line and React Native patch release, then synchronized the npm lockfile.
+- Replaced full-history request loops with delayed, cancellable incremental activity polling and explicit Jules API timeouts.
+- Hardened Pro activation against malformed responses, mismatched License Keys, dead endpoints, timeouts, and secure-storage failures.
+- Replaced placeholder platform icons and the anonymous Android application ID with JulesMe release metadata.
+- Required secret-backed Android release signing and certificate verification; debug-signed release artifacts are rejected.
 
 ## [1.1.7] - 2026-08-27
 

@@ -24,9 +24,10 @@ import {
   Activity,
   approvePlan,
   Artifact,
+  createRequestPollingController,
   createSession,
-  getAllActivities,
   getSession,
+  getSessionSnapshot,
   JulesApiError,
   pollActivities,
   Session,
@@ -90,6 +91,24 @@ function isTerminalState(state?: string) {
 
 function isWorkingState(state?: string) {
   return state === 'QUEUED' || state === 'PLANNING' || state === 'IN_PROGRESS';
+}
+
+function getLatestActivityCreateTime(
+  activities: Activity[],
+  current?: string,
+): string | undefined {
+  let latest = current;
+  let latestTime = current ? new Date(current).getTime() : Number.NEGATIVE_INFINITY;
+
+  activities.forEach(activity => {
+    const activityTime = new Date(activity.createTime).getTime();
+    if (!Number.isNaN(activityTime) && activityTime > latestTime) {
+      latest = activity.createTime;
+      latestTime = activityTime;
+    }
+  });
+
+  return latest;
 }
 
 function formatActivityTime(createTime: string, t: Translator): string {
@@ -215,11 +234,10 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [selectedImage, setSelectedImage] = useState<ImageAttachment | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const [pollingTrigger, setPollingTrigger] = useState(0);
+  const [pollingRestartTrigger, setPollingRestartTrigger] = useState(0);
   const [isApproving, setIsApproving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activitiesNextPageToken, setActivitiesNextPageToken] = useState<string | undefined>();
-  const [hasLoadedOlderActivities, setHasLoadedOlderActivities] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [expandedArtifacts, setExpandedArtifacts] = useState<Set<string>>(new Set());
@@ -235,6 +253,8 @@ export default function ChatScreen() {
   const timelineViewportHeight = useRef(0);
   const hasInitialScrolled = useRef(false);
   const isNearBottomRef = useRef(true);
+  const hasLoadedOlderActivities = useRef(false);
+  const latestActivityCreateTime = useRef<string | undefined>(undefined);
 
   const updateTimelineScrollability = useCallback(() => {
     const scrollable = timelineContentHeight.current > timelineViewportHeight.current + 8;
@@ -294,9 +314,10 @@ export default function ChatScreen() {
   useEffect(() => {
     hasInitialScrolled.current = false;
     isNearBottomRef.current = true;
+    hasLoadedOlderActivities.current = false;
+    latestActivityCreateTime.current = undefined;
     const timer = setTimeout(() => {
       setActivitiesNextPageToken(undefined);
-      setHasLoadedOlderActivities(false);
     }, 0);
     return () => clearTimeout(timer);
   }, [sessionId]);
@@ -320,61 +341,51 @@ export default function ChatScreen() {
     if (!apiKey || !sessionId) return;
 
     let disposed = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    let requestInFlight = false;
+    const pollingController = createRequestPollingController({
+      intervalMs: 5_000,
+      poll: async signal => {
+        setIsRefreshing(true);
+        try {
+          const activityCreatedAfter = latestActivityCreateTime.current;
+          const snapshot = await getSessionSnapshot(apiKey, sessionId, {
+            activityCreatedAfter,
+            signal,
+          });
+          if (disposed || signal.aborted) return false;
 
-    const stopPolling = () => {
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-    };
-
-    const syncSession = async () => {
-      if (disposed || requestInFlight) return;
-      requestInFlight = true;
-      setIsRefreshing(true);
-      try {
-        const [sessionResult, activityResult] = await Promise.all([
-          getSession(apiKey, sessionId),
-          getAllActivities(apiKey, sessionId),
-        ]);
-        if (disposed) return;
-        setSession(sessionResult);
-        mergeActivities(activityResult.activities);
-        setPollingTrigger(prev => prev + 1);
-        if (!hasLoadedOlderActivities) {
-          setActivitiesNextPageToken(activityResult.nextPageToken);
+          setSession(snapshot.session);
+          mergeActivities(snapshot.activityPage.activities);
+          latestActivityCreateTime.current = getLatestActivityCreateTime(
+            snapshot.activityPage.activities,
+            latestActivityCreateTime.current,
+          );
+          if (!activityCreatedAfter && !hasLoadedOlderActivities.current) {
+            setActivitiesNextPageToken(snapshot.activityPage.nextPageToken);
+          }
+          setChatError(null);
+          return !isTerminalState(snapshot.session.state);
+        } finally {
+          if (!disposed && !signal.aborted) setIsRefreshing(false);
         }
-        setChatError(null);
-        if (isTerminalState(sessionResult.state)) stopPolling();
-      } catch (error) {
+      },
+      onError: error => {
         if (!disposed) setChatError(getChatErrorMessage(error, t));
-      } finally {
-        requestInFlight = false;
-        if (!disposed) setIsRefreshing(false);
-      }
-    };
-
-    const startPolling = () => {
-      if (timer || disposed) return;
-      void syncSession();
-      timer = setInterval(() => void syncSession(), 5000);
-    };
-
-    const appStateSubscription = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active') startPolling();
-      else stopPolling();
+      },
     });
 
-    if (AppState.currentState === 'active') startPolling();
+    const appStateSubscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') pollingController.start();
+      else pollingController.stop();
+    });
+
+    if (AppState.currentState === 'active') pollingController.start();
 
     return () => {
       disposed = true;
-      stopPolling();
+      pollingController.stop();
       appStateSubscription.remove();
     };
-  }, [apiKey, hasLoadedOlderActivities, mergeActivities, sessionId, t, pollingTrigger]);
+  }, [apiKey, mergeActivities, pollingRestartTrigger, sessionId, t]);
 
   const handleSend = async () => {
     const prompt = inputText.trim();
@@ -427,6 +438,7 @@ export default function ChatScreen() {
         setSession(createdSession);
         router.setParams({ sessionId: nextSessionId });
       } else {
+        const shouldRestartPolling = isTerminalState(session?.state);
         await sendMessageToJules(apiKey, sessionId, prompt, imagePayload);
         const [sessionResult, activityResult] = await Promise.all([
           getSession(apiKey, sessionId),
@@ -434,7 +446,13 @@ export default function ChatScreen() {
         ]);
         setSession(sessionResult);
         mergeActivities(activityResult.activities);
-        setPollingTrigger(prev => prev + 1);
+        latestActivityCreateTime.current = getLatestActivityCreateTime(
+          activityResult.activities,
+          latestActivityCreateTime.current,
+        );
+        if (shouldRestartPolling) {
+          setPollingRestartTrigger(current => current + 1);
+        }
       }
     } catch (error) {
       setTimeline(current => current.filter(item => item.id !== optimisticId));
@@ -458,6 +476,10 @@ export default function ChatScreen() {
       ]);
       setSession(sessionResult);
       mergeActivities(activityResult.activities);
+      latestActivityCreateTime.current = getLatestActivityCreateTime(
+        activityResult.activities,
+        latestActivityCreateTime.current,
+      );
     } catch (error) {
       setChatError(getChatErrorMessage(error, t));
     } finally {
@@ -473,7 +495,7 @@ export default function ChatScreen() {
       const result = await pollActivities(apiKey, sessionId, activitiesNextPageToken);
       mergeActivities(result.activities);
       setActivitiesNextPageToken(result.nextPageToken);
-      setHasLoadedOlderActivities(true);
+      hasLoadedOlderActivities.current = true;
     } catch (error) {
       setChatError(getChatErrorMessage(error, t));
     } finally {
@@ -1033,7 +1055,7 @@ export default function ChatScreen() {
                 accessibilityLabel={t('retry')}
                 onPress={() => {
                   setChatError(null);
-                  setPollingTrigger(p => p + 1);
+                  setPollingRestartTrigger(current => current + 1);
                 }}
                 style={styles.errorNoticeBtn}
               >

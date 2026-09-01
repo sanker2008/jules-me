@@ -9,6 +9,7 @@
 import { encodeJulesResourceId, encodeJulesResourcePath } from '../utils/jules-guards';
 
 const BASE_URL = 'https://jules.googleapis.com/v1alpha';
+export const JULES_API_REQUEST_TIMEOUT_MS = 15_000;
 
 export class JulesApiError extends Error {
   constructor(
@@ -183,9 +184,29 @@ async function request<T>(
   apiKey: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const requestController = new AbortController();
+  const externalSignal = init.signal;
+  let didTimeout = false;
+
+  const abortFromExternalSignal = () => {
+    requestController.abort(externalSignal?.reason);
+  };
+
+  if (externalSignal?.aborted) {
+    abortFromExternalSignal();
+  } else {
+    externalSignal?.addEventListener('abort', abortFromExternalSignal, { once: true });
+  }
+
+  const timeout = setTimeout(() => {
+    didTimeout = true;
+    requestController.abort(new Error('Jules API request timed out.'));
+  }, JULES_API_REQUEST_TIMEOUT_MS);
+
   try {
     const response = await fetch(`${BASE_URL}${path}`, {
       ...init,
+      signal: requestController.signal,
       headers: {
         'X-Goog-Api-Key': apiKey,
         ...init.headers,
@@ -210,18 +231,122 @@ async function request<T>(
       throw error;
     }
 
+    if (didTimeout) {
+      throw new JulesApiError('The Jules API request timed out. Please try again.');
+    }
+
+    if (requestController.signal.aborted) {
+      throw new JulesApiError('The Jules API request was cancelled.');
+    }
+
     throw new JulesApiError(
       'Unable to reach the Jules API. Check your network connection and try again.',
     );
+  } finally {
+    clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', abortFromExternalSignal);
   }
 }
 
-function listPath(path: string, pageSize: number, pageToken?: string): string {
+export interface RequestPollingOptions {
+  intervalMs: number;
+  poll: (signal: AbortSignal) => Promise<boolean | void>;
+  onError?: (error: unknown) => void;
+  schedule?: (callback: () => void, delayMs: number) => unknown;
+  cancelSchedule?: (handle: unknown) => void;
+}
+
+/**
+ * Runs one request immediately, then schedules the next request only after the
+ * previous one has settled. Stopping also aborts the current request.
+ */
+export function createRequestPollingController({
+  intervalMs,
+  poll,
+  onError,
+  schedule = (callback, delayMs) => setTimeout(callback, delayMs),
+  cancelSchedule = handle => clearTimeout(handle as ReturnType<typeof setTimeout>),
+}: RequestPollingOptions) {
+  let active = false;
+  let scheduledHandle: unknown;
+  let currentController: AbortController | null = null;
+  let runSequence = 0;
+
+  const clearScheduledRun = () => {
+    if (scheduledHandle === undefined) return;
+    cancelSchedule(scheduledHandle);
+    scheduledHandle = undefined;
+  };
+
+  const run = async () => {
+    if (!active || currentController) return;
+
+    const requestController = new AbortController();
+    const sequence = ++runSequence;
+    currentController = requestController;
+    let keepPolling = true;
+
+    try {
+      keepPolling = await poll(requestController.signal) !== false;
+    } catch (error) {
+      if (active && !requestController.signal.aborted) onError?.(error);
+    } finally {
+      if (currentController === requestController) currentController = null;
+
+      if (!active || sequence !== runSequence || requestController.signal.aborted) return;
+      if (!keepPolling) {
+        active = false;
+        return;
+      }
+
+      scheduledHandle = schedule(() => {
+        scheduledHandle = undefined;
+        void run();
+      }, intervalMs);
+    }
+  };
+
+  return {
+    start() {
+      if (active) return;
+      active = true;
+      void run();
+    },
+    stop() {
+      active = false;
+      runSequence += 1;
+      clearScheduledRun();
+      currentController?.abort();
+      currentController = null;
+    },
+  };
+}
+
+function listPath(
+  path: string,
+  pageSize: number,
+  pageToken?: string,
+  filter?: string,
+): string {
   const params = new URLSearchParams({ pageSize: String(pageSize) });
   if (pageToken) {
     params.set('pageToken', pageToken);
   }
+  if (filter) {
+    params.set('filter', filter);
+  }
   return `${path}?${params.toString()}`;
+}
+
+function getActivityCreatedAfterFilter(createdAfter?: string): string | undefined {
+  if (!createdAfter) return undefined;
+
+  const timestamp = new Date(createdAfter);
+  if (Number.isNaN(timestamp.getTime())) {
+    throw new JulesApiError('Invalid Jules activity timestamp.');
+  }
+
+  return `create_time > "${timestamp.toISOString()}"`;
 }
 
 export async function getSources(apiKey: string, pageToken?: string) {
@@ -252,8 +377,12 @@ export async function getSessions(apiKey: string, pageToken?: string) {
   };
 }
 
-export function getSession(apiKey: string, sessionId: string): Promise<Session> {
-  return request<Session>(`/sessions/${getResourceId(sessionId, 'session')}`, apiKey);
+export function getSession(
+  apiKey: string,
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<Session> {
+  return request<Session>(`/sessions/${getResourceId(sessionId, 'session')}`, apiKey, { signal });
 }
 
 export function formatPromptWithImage(
@@ -319,10 +448,18 @@ export async function pollActivities(
   apiKey: string,
   sessionId: string,
   pageToken?: string,
+  options: { createdAfter?: string; pageSize?: number; signal?: AbortSignal } = {},
 ) {
+  const { createdAfter, pageSize = 100, signal } = options;
   const result = await request<PaginatedActivities>(
-    listPath(`/sessions/${getResourceId(sessionId, 'session')}/activities`, 100, pageToken),
+    listPath(
+      `/sessions/${getResourceId(sessionId, 'session')}/activities`,
+      pageSize,
+      pageToken,
+      getActivityCreatedAfterFilter(createdAfter),
+    ),
     apiKey,
+    { signal },
   );
 
   return {
@@ -331,28 +468,64 @@ export async function pollActivities(
   };
 }
 
-export async function getAllActivities(
+async function pollNewActivities(
   apiKey: string,
   sessionId: string,
-  maxPages = 10,
+  createdAfter: string,
+  pageSize: number,
+  signal?: AbortSignal,
 ) {
-  let accumulated: Activity[] = [];
+  const activities: Activity[] = [];
+  const seenPageTokens = new Set<string>();
   let pageToken: string | undefined;
-  let pageCount = 0;
 
   do {
-    const result = await pollActivities(apiKey, sessionId, pageToken);
-    if (result.activities?.length) {
-      accumulated = accumulated.concat(result.activities);
-    }
-    pageToken = result.nextPageToken;
-    pageCount += 1;
-  } while (pageToken && pageCount < maxPages);
+    const page = await pollActivities(apiKey, sessionId, pageToken, {
+      createdAfter,
+      pageSize,
+      signal,
+    });
+    activities.push(...page.activities);
+    pageToken = page.nextPageToken;
 
-  return {
-    activities: accumulated,
-    nextPageToken: pageToken,
-  };
+    if (pageToken) {
+      if (seenPageTokens.has(pageToken)) {
+        throw new JulesApiError('The Jules API returned an invalid activity page token.');
+      }
+      seenPageTokens.add(pageToken);
+    }
+  } while (pageToken && !signal?.aborted);
+
+  return { activities, nextPageToken: pageToken };
+}
+
+export function getSessionSnapshot(
+  apiKey: string,
+  sessionId: string,
+  options: {
+    activityCreatedAfter?: string;
+    activityPageSize?: number;
+    signal?: AbortSignal;
+  } = {},
+) {
+  const { activityCreatedAfter, activityPageSize = 100, signal } = options;
+  const activityRequest = activityCreatedAfter
+    ? pollNewActivities(
+        apiKey,
+        sessionId,
+        activityCreatedAfter,
+        activityPageSize,
+        signal,
+      )
+    : pollActivities(apiKey, sessionId, undefined, {
+        pageSize: activityPageSize,
+        signal,
+      });
+
+  return Promise.all([
+    getSession(apiKey, sessionId, signal),
+    activityRequest,
+  ]).then(([session, activityPage]) => ({ session, activityPage }));
 }
 
 export function getActivity(
@@ -369,4 +542,3 @@ export async function approvePlan(apiKey: string, sessionId: string): Promise<vo
     headers: { 'Content-Type': 'application/json' },
   });
 }
-

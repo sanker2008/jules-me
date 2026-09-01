@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/sanker2008/jules-me/releases"><img src="https://img.shields.io/github/v/release/sanker2008/jules-me?color=2563eb" alt="Release" /></a>
-  <a href="https://docs.expo.dev/versions/v57.0.0/"><img src="https://img.shields.io/badge/Expo-v57.0.6-000020.svg" alt="Expo" /></a>
+  <a href="https://docs.expo.dev/versions/v57.0.0/"><img src="https://img.shields.io/badge/Expo-v57.0.18-000020.svg" alt="Expo" /></a>
   <a href="https://reactnative.dev/"><img src="https://img.shields.io/badge/React%20Native-0.86-61dafb.svg" alt="React Native" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License" /></a>
 </p>
@@ -66,13 +66,13 @@ JulesMe 采用 **Open-Core（开源核心 + Pro 商业增值）** 模式，为�
 ## 💻 本地开发
 
 ### 前置条件
-- Node.js 20+
-- npm 或 pnpm
+- Node.js 22.13+
+- npm
 
 ### 启动项目
 ```bash
 # 1. 安装依赖
-npm install
+npm ci
 
 # 2. 启动 Expo 开发服务
 npx expo start
@@ -101,12 +101,39 @@ npm run lint
 
 本项目使用 GitHub Actions 进行全自动 CI/CD 打包。
 
-* **下载最新安装包**：前往 [**Releases 页面**](https://github.com/sanker2008/jules-me/releases) 下载最新版本的 `app-release.apk`。
-* **发布新版本**：打上版本号 Tag 推送即可自动触发构建：
+### 下载与安装
+
+前往 [**Releases 页面**](https://github.com/sanker2008/jules-me/releases) 下载最新版本的 APK。每个版本按处理器架构分别提供安装包，文件名格式为 `JulesMe-v<版本号>-<架构>.apk`。
+
+| 你的设备 | 应下载的安装包 |
+| --- | --- |
+| **绝大多数近年安卓手机** | `JulesMe-v<版本号>-arm64-v8a.apk`（推荐） |
+| 较旧的 32 位安卓手机 | `JulesMe-v<版本号>-armeabi-v7a.apk` |
+| Android 模拟器 | `x86_64` 或 `x86` 对应的 APK |
+
+> **不知道选哪个？** 请优先下载 `arm64-v8a`，它适用于绝大多数实体安卓手机。`x86` 与 `x86_64` 仅面向模拟器。
+>
+> `.aab` 是 Google Play 等应用商店的发布包，不能直接在手机上安装；普通用户请选择 `.apk`。
+
+### 发布新版本
+
+打上版本号 Tag 推送即可自动触发构建：
+
   ```bash
-  git tag 1.1.7
-  git push origin 1.1.7
+  VERSION=1.1.9
+  git tag "$VERSION"
+  git push origin "$VERSION"
   ```
+
+发布前需要在 GitHub Actions Secrets 配置以下正式签名信息：
+
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+- `ANDROID_SIGNING_CERT_SHA256`（可选，但建议配置用于证书指纹校验）
+
+缺少任一必需 Secret 时发布任务会直接失败，不会回退到 Android Debug 签名。
 
 ---
 

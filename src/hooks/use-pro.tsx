@@ -1,17 +1,17 @@
 import React from 'react';
 
-import type { LicenseActivationResult, ProState } from '../types/pro';
+import type { ProState } from '../types/pro';
 import {
   activateLicenseKey,
   clearSavedProState,
   loadSavedProState,
 } from '../utils/license';
-import { createFreeProState } from '../utils/license-state';
+import { createFreeProState, type ProLicenseActivationResult } from '../utils/license-state';
 
 interface ProContextValue {
   proState: ProState;
   isLoading: boolean;
-  activate: (licenseKey: string) => Promise<LicenseActivationResult>;
+  activate: (licenseKey: string) => Promise<ProLicenseActivationResult>;
   deactivate: () => Promise<void>;
   refresh: () => Promise<void>;
 }

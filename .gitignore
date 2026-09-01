@@ -2,6 +2,7 @@
 
 # dependencies
 node_modules/
+/node_modules
 
 # Expo
 .expo/
@@ -26,6 +27,8 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 *.log
+build_pid.txt
+.playwright-cli/
 
 # macOS
 .DS_Store
