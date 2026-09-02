@@ -4,6 +4,19 @@ All notable changes to JulesMe are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.10] - 2026-09-02
+
+### Security
+
+- Split Android release signing into an offline-generated app-signing key for GitHub Release APKs and a separate upload key for Google Play AAB submissions.
+- Required both Android package jobs to use the protected `android-release` GitHub Environment and pinned each artifact to its intended certificate SHA-256 fingerprint.
+
+### Changed
+
+- Advanced the Expo version to `1.1.10`, iOS build number to `20`, and Android version code to `20`.
+- Aligned Expo SDK 57 patch dependencies with the current versioned compatibility set enforced by Expo Doctor.
+- Pinned the patched Browserslist 4.x line to clear newly disclosed high-severity audit findings without forcing an Expo downgrade.
+
 ## [1.1.9] - 2026-08-31
 
 ### Added

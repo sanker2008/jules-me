@@ -57,6 +57,7 @@ jobs:
   build-apk:
     name: Build APK (${{ matrix.abi }})
     needs: quality
+    environment: android-release
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -84,26 +85,27 @@ jobs:
       - name: Validate release metadata
         run: npm run validate:release
 
-      - name: Restore release keystore
+      - name: Restore app-signing keystore
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_APP_SIGNING_KEYSTORE_BASE64: ${{ secrets.ANDROID_APP_SIGNING_KEYSTORE_BASE64 }}
+          ANDROID_APP_SIGNING_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_APP_SIGNING_KEYSTORE_PASSWORD }}
+          ANDROID_APP_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_APP_SIGNING_KEY_ALIAS }}
+          ANDROID_APP_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_APP_SIGNING_KEY_PASSWORD }}
+          ANDROID_APP_SIGNING_CERT_SHA256: ${{ secrets.ANDROID_APP_SIGNING_CERT_SHA256 }}
         run: |
           missing=()
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+          for name in ANDROID_APP_SIGNING_KEYSTORE_BASE64 ANDROID_APP_SIGNING_KEYSTORE_PASSWORD ANDROID_APP_SIGNING_KEY_ALIAS ANDROID_APP_SIGNING_KEY_PASSWORD ANDROID_APP_SIGNING_CERT_SHA256; do
             if [ -z "${!name}" ]; then
               missing+=("$name")
             fi
           done
           if [ "${#missing[@]}" -ne 0 ]; then
-            echo "Missing required Android signing secrets: ${missing[*]}" >&2
+            echo "Missing required Android app-signing secrets: ${missing[*]}" >&2
             exit 1
           fi
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release.keystore
-          test -s release.keystore
-          chmod 600 release.keystore
+          printf '%s' "$ANDROID_APP_SIGNING_KEYSTORE_BASE64" | base64 --decode > app-signing.keystore
+          test -s app-signing.keystore
+          chmod 600 app-signing.keystore
 
       - name: Prebuild Android project
         run: npx expo prebuild --platform android --clean
@@ -130,10 +132,10 @@ jobs:
       - name: Build release APK
         working-directory: android
         env:
-          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/app-signing.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_APP_SIGNING_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_APP_SIGNING_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_APP_SIGNING_KEY_PASSWORD }}
         run: >-
           ./gradlew assembleRelease --no-daemon
           -PreactNativeArchitectures=${{ matrix.abi }}
@@ -143,7 +145,7 @@ jobs:
 
       - name: Verify APK release certificate
         env:
-          EXPECTED_CERT_SHA256: ${{ secrets.ANDROID_SIGNING_CERT_SHA256 }}
+          EXPECTED_CERT_SHA256: ${{ secrets.ANDROID_APP_SIGNING_CERT_SHA256 }}
         run: |
           apk="android/app/build/outputs/apk/release/app-release.apk"
           apksigner_path="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
@@ -164,8 +166,12 @@ jobs:
             echo "Release APK is signed with the forbidden Android debug certificate" >&2
             exit 1
           fi
-          if [ -n "$expected_sha256" ] && [ "$actual_sha256" != "$expected_sha256" ]; then
-            echo "APK signer certificate does not match ANDROID_SIGNING_CERT_SHA256" >&2
+          if [ -z "$expected_sha256" ]; then
+            echo "ANDROID_APP_SIGNING_CERT_SHA256 is required" >&2
+            exit 1
+          fi
+          if [ "$actual_sha256" != "$expected_sha256" ]; then
+            echo "APK signer certificate does not match ANDROID_APP_SIGNING_CERT_SHA256" >&2
             exit 1
           fi
 
@@ -190,6 +196,7 @@ jobs:
   build-aab:
     name: Build Android App Bundle
     needs: quality
+    environment: android-release
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -209,26 +216,27 @@ jobs:
       - name: Validate release metadata
         run: npm run validate:release
 
-      - name: Restore release keystore
+      - name: Restore upload keystore
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          ANDROID_UPLOAD_CERT_SHA256: ${{ secrets.ANDROID_UPLOAD_CERT_SHA256 }}
         run: |
           missing=()
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+          for name in ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_KEYSTORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD ANDROID_UPLOAD_CERT_SHA256; do
             if [ -z "${!name}" ]; then
               missing+=("$name")
             fi
           done
           if [ "${#missing[@]}" -ne 0 ]; then
-            echo "Missing required Android signing secrets: ${missing[*]}" >&2
+            echo "Missing required Android upload-signing secrets: ${missing[*]}" >&2
             exit 1
           fi
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release.keystore
-          test -s release.keystore
-          chmod 600 release.keystore
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 --decode > upload.keystore
+          test -s upload.keystore
+          chmod 600 upload.keystore
 
       - name: Prebuild Android project
         run: npx expo prebuild --platform android --clean
@@ -255,10 +263,10 @@ jobs:
       - name: Build release AAB
         working-directory: android
         env:
-          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/upload.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
         run: >-
           ./gradlew bundleRelease --no-daemon
           -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64
@@ -268,11 +276,11 @@ jobs:
 
       - name: Verify AAB release certificate
         env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          EXPECTED_CERT_SHA256: ${{ secrets.ANDROID_SIGNING_CERT_SHA256 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          EXPECTED_CERT_SHA256: ${{ secrets.ANDROID_UPLOAD_CERT_SHA256 }}
         run: |
           aab="android/app/build/outputs/bundle/release/app-release.aab"
-          verification="$(jarsigner -verify -strict -certs -keystore release.keystore -storepass:env ANDROID_KEYSTORE_PASSWORD "$aab")"
+          verification="$(jarsigner -verify -strict -certs -keystore upload.keystore -storepass:env ANDROID_KEYSTORE_PASSWORD "$aab")"
           printf '%s\n' "$verification"
           certificate="$(keytool -printcert -jarfile "$aab")"
           printf '%s\n' "$certificate"
@@ -287,8 +295,12 @@ jobs:
             echo "Release AAB is signed with the forbidden Android debug certificate" >&2
             exit 1
           fi
-          if [ -n "$expected_sha256" ] && [ "$actual_sha256" != "$expected_sha256" ]; then
-            echo "AAB signer certificate does not match ANDROID_SIGNING_CERT_SHA256" >&2
+          if [ -z "$expected_sha256" ]; then
+            echo "ANDROID_UPLOAD_CERT_SHA256 is required" >&2
+            exit 1
+          fi
+          if [ "$actual_sha256" != "$expected_sha256" ]; then
+            echo "AAB signer certificate does not match ANDROID_UPLOAD_CERT_SHA256" >&2
             exit 1
           fi
 

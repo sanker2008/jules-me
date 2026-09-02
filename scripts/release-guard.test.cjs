@@ -6,28 +6,28 @@ const {
   validateReleaseMetadata,
 } = require('./release-guard.cjs');
 
-const packageJson = { version: '1.1.9' };
+const packageJson = { version: '1.1.10' };
 const appJson = {
   expo: {
-    version: '1.1.9',
-    ios: { buildNumber: '19' },
-    android: { package: 'com.sanomni.julesme', versionCode: 19 },
+    version: '1.1.10',
+    ios: { buildNumber: '20' },
+    android: { package: 'com.sanomni.julesme', versionCode: 20 },
   },
 };
 
 test('accepts matching package, Expo, build metadata, and v-prefixed tag', () => {
-  assert.equal(normalizeReleaseTag('v1.1.9'), '1.1.9');
+  assert.equal(normalizeReleaseTag('v1.1.10'), '1.1.10');
   assert.doesNotThrow(() => validateReleaseMetadata({
     packageJson,
     appJson,
-    tag: 'v1.1.9',
+    tag: 'v1.1.10',
   }));
 });
 
 test('rejects a tag that does not match the packaged application version', () => {
   assert.throws(
     () => validateReleaseMetadata({ packageJson, appJson, tag: '1.1.8' }),
-    /tag version 1\.1\.8 does not match package version 1\.1\.9/,
+    /tag version 1\.1\.8 does not match package version 1\.1\.10/,
   );
 });
 
@@ -37,7 +37,7 @@ test('rejects divergent package and Expo versions', () => {
       packageJson,
       appJson: { ...appJson, expo: { ...appJson.expo, version: '1.1.8' } },
     }),
-    /Expo version 1\.1\.8 does not match package version 1\.1\.9/,
+    /Expo version 1\.1\.8 does not match package version 1\.1\.10/,
   );
 });
 

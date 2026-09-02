@@ -120,20 +120,24 @@ npm run lint
 打上版本号 Tag 推送即可自动触发构建：
 
   ```bash
-  VERSION=1.1.9
+  VERSION=1.1.10
   git tag "$VERSION"
   git push origin "$VERSION"
   ```
 
-发布前需要在 GitHub Actions Secrets 配置以下正式签名信息：
+发布签名采用“双密钥 + Google Play App Signing”：
 
-- `ANDROID_KEYSTORE_BASE64`
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_ALIAS`
-- `ANDROID_KEY_PASSWORD`
-- `ANDROID_SIGNING_CERT_SHA256`（可选，但建议配置用于证书指纹校验）
+- **应用签名密钥**签署 GitHub Release APK，并在首次上架前导入 Google Play App Signing，使 GitHub APK 与 Play 下发版本保持同一应用签名。
+- **上传密钥**只签署提交到 Google Play 的 AAB；上传密钥泄露时可向 Google 申请重置，不影响应用签名密钥。
 
-缺少任一必需 Secret 时发布任务会直接失败，不会回退到 Android Debug 签名。
+两组密钥均在仓库外生成，GitHub Actions 只从受保护的 `android-release` Environment 读取以下 Secrets：
+
+| 用途 | Environment Secrets |
+| --- | --- |
+| GitHub Release APK | `ANDROID_APP_SIGNING_KEYSTORE_BASE64`、`ANDROID_APP_SIGNING_KEYSTORE_PASSWORD`、`ANDROID_APP_SIGNING_KEY_ALIAS`、`ANDROID_APP_SIGNING_KEY_PASSWORD`、`ANDROID_APP_SIGNING_CERT_SHA256` |
+| Google Play AAB | `ANDROID_UPLOAD_KEYSTORE_BASE64`、`ANDROID_UPLOAD_KEYSTORE_PASSWORD`、`ANDROID_UPLOAD_KEY_ALIAS`、`ANDROID_UPLOAD_KEY_PASSWORD`、`ANDROID_UPLOAD_CERT_SHA256` |
+
+缺少任一 Secret、证书指纹不匹配或检测到 Android Debug 证书时，发布任务都会直接失败。密钥文件、密码和 Base64 内容不得写入仓库、Issue 或日志。
 
 ---
 
