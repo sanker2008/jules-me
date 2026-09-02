@@ -4,6 +4,16 @@ All notable changes to JulesMe are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.12] - 2026-09-02
+
+### Fixed
+
+- Made APK certificate verification accept both legacy and signature-scheme-qualified `apksigner` output while continuing to reject missing, debug, or mismatched signers.
+
+### Changed
+
+- Advanced the Expo version to `1.1.12`, iOS build number to `22`, and Android version code to `22` after the failed `1.1.11` APK verification attempt.
+
 ## [1.1.11] - 2026-09-02
 
 ### Fixed
