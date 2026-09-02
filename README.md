@@ -120,7 +120,7 @@ npm run lint
 打上版本号 Tag 推送即可自动触发构建：
 
   ```bash
-  VERSION=1.1.10
+  VERSION=1.1.11
   git tag "$VERSION"
   git push origin "$VERSION"
   ```

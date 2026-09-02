@@ -2,7 +2,7 @@
   "expo": {
     "name": "JulesMe",
     "slug": "julesMe",
-    "version": "1.1.10",
+    "version": "1.1.11",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -19,7 +19,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon-ios.png",
-      "buildNumber": "20"
+      "buildNumber": "21"
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +28,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.sanomni.julesme",
-      "versionCode": 20
+      "versionCode": 21
     },
     "web": {
       "output": "static",

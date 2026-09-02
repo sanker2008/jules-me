@@ -4,6 +4,17 @@ All notable changes to JulesMe are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.11] - 2026-09-02
+
+### Fixed
+
+- Regenerated the npm lockfile with the GitHub runner's npm 10 line so clean CI installs include the required Emscripten N-API peer packages.
+- Replaced the legacy blue native splash background with the JulesMe brand purple while retaining the centered app logo.
+
+### Changed
+
+- Advanced the Expo version to `1.1.11`, iOS build number to `21`, and Android version code to `21` after the failed `1.1.10` build attempt.
+
 ## [1.1.10] - 2026-09-02
 
 ### Security
