@@ -4,6 +4,14 @@ All notable changes to JulesMe are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.13] - 2026-09-04
+
+### Changed
+
+- Redesigned the UI with a clean flat, zero-border-radius style across workbench, chat timeline, settings, and modal components.
+- Removed nested card enclosures, pills, and elevation/drop shadows in favor of subtle flat surfaces and hairline dividers.
+- Advanced the Expo version to `1.1.13`, iOS build number to `23`, and Android version code to `23`.
+
 ## [1.1.12] - 2026-09-02
 
 ### Fixed

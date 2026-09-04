@@ -89,8 +89,8 @@ export default function SettingsScreen() {
       ? t('proPurchase')
       : t('proComingSoonAction');
   const proCardColors = theme === 'dark'
-    ? { backgroundColor: isProActive ? '#1F1A38' : '#35270F', borderColor: isProActive ? '#4A3F85' : '#86611D' }
-    : { backgroundColor: isProActive ? '#F5F2FF' : '#FFF8E8', borderColor: isProActive ? '#D9D1FF' : '#F4D68A' };
+    ? { backgroundColor: isProActive ? '#1F1A38' : '#35270F', borderLeftColor: isProActive ? '#8374F5' : '#E09F3E' }
+    : { backgroundColor: isProActive ? '#F5F2FF' : '#FFF8E8', borderLeftColor: isProActive ? '#6656D7' : '#D9822B' };
 
   return (
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: themeColors.background }]}>
@@ -113,7 +113,7 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={[styles.card, styles.proCard, proCardColors]}>
+        <View style={[styles.proCard, proCardColors]}>
           {isProLoading ? (
             <View style={styles.proLoading}>
               <Text selectable style={[styles.cardTitle, { color: themeColors.text }]}>{t('proTitle')}</Text>
@@ -170,7 +170,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* API Key Section */}
-        <View style={[styles.card, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+        <View style={[styles.card, { borderBottomColor: themeColors.cardBorder }]}>
           <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
           <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{apiKeyStorageDescription}</Text>
 
@@ -204,7 +204,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Theme Preference Section */}
-        <View style={[styles.card, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+        <View style={[styles.card, { borderBottomColor: themeColors.cardBorder }]}>
           <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('theme')}</Text>
           <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('themeDescription')}</Text>
 
@@ -253,7 +253,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Language Preference Section */}
-        <View style={[styles.card, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+        <View style={[styles.card, { borderBottomColor: themeColors.cardBorder }]}>
           <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('language')}</Text>
           <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('languageDescription')}</Text>
 
@@ -302,7 +302,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* About JulesMe Section */}
-        <View style={[styles.card, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+        <View style={[styles.card, styles.lastCard]}>
           <View style={styles.aboutHeaderRow}>
             <Image source={require('@/assets/images/jules-logo.png')} style={styles.aboutLogo} />
             <View style={styles.aboutHeaderCopy}>
@@ -361,9 +361,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   topBarLogo: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: 0,
   },
   topBarTitle: {
     fontSize: 18,
@@ -395,17 +395,26 @@ const styles = StyleSheet.create({
     maxWidth: 760,
     alignSelf: 'center',
     padding: 16,
-    gap: 16,
+    gap: 0,
     paddingBottom: 40,
   },
   card: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: 1,
+    paddingVertical: 20,
+    paddingHorizontal: 0,
+  },
+  lastCard: {
+    borderBottomWidth: 0,
   },
   proCard: {
     gap: 10,
-    boxShadow: '0 4px 12px rgba(72, 46, 10, 0.12)',
+    padding: 16,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderLeftWidth: 3,
+    marginBottom: 8,
   },
   proHeader: {
     flexDirection: 'row',
@@ -421,13 +430,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   proBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 0,
   },
   proBadgeText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
   proKey: {
@@ -435,15 +444,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   proPrimaryButton: {
-    minHeight: 46,
-    borderRadius: 12,
+    minHeight: 44,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
   },
   proSecondaryButton: {
     minHeight: 42,
-    borderRadius: 12,
+    borderRadius: 0,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -457,8 +466,9 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
+    letterSpacing: -0.2,
   },
   cardDescription: {
     fontSize: 13,
@@ -472,15 +482,15 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   inputRow: {
-    minHeight: 48,
-    borderRadius: 12,
+    minHeight: 46,
+    borderRadius: 0,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
   input: {
     flex: 1,
-    minHeight: 46,
+    minHeight: 44,
     paddingLeft: 12,
     paddingRight: 6,
     fontSize: 15,
@@ -489,7 +499,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     marginRight: 6,
-    borderRadius: 18,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -502,8 +512,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   saveButton: {
-    minHeight: 46,
-    borderRadius: 12,
+    minHeight: 44,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 14,
@@ -515,7 +525,7 @@ const styles = StyleSheet.create({
   },
   selectBox: {
     minHeight: 46,
-    borderRadius: 12,
+    borderRadius: 0,
     borderWidth: 1,
     paddingHorizontal: 14,
     flexDirection: 'row',
@@ -532,8 +542,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   menuList: {
-    marginTop: 8,
-    borderRadius: 12,
+    marginTop: 4,
+    borderRadius: 0,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -559,9 +569,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   aboutLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 0,
   },
   aboutHeaderCopy: {
     flex: 1,

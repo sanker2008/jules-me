@@ -130,10 +130,10 @@ const styles = StyleSheet.create({
   image: {
     width: 80,
     height: 80,
-    borderRadius: 40,
+    borderRadius: 0,
   },
   background: {
-    borderRadius: 40,
+    borderRadius: 0,
     experimental_backgroundImage: `linear-gradient(180deg, #6656D7, #4838B5)`,
     width: 128,
     height: 128,
