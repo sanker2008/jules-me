@@ -1,7 +1,6 @@
 import React from 'react';
 import { BottomSheet, RNHostView } from '@expo/ui';
 import {
-  ActivityIndicator,
   Keyboard,
   Linking,
   Platform,
@@ -16,6 +15,7 @@ import {
 import type { Translator } from '../i18n';
 import { useTheme } from '../hooks/use-theme';
 import { isSafeHttpsUrl, type ProLicenseActivationResult } from '../utils/license-state';
+import { GradientButton } from './gradient-button';
 
 interface ProPaywallModalProps {
   visible: boolean;
@@ -140,21 +140,21 @@ export function ProPaywallModal({
           </View>
 
           {!activationAvailable ? (
-            <View style={[styles.serviceNotice, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.cardBorder }]}>
+            <View style={[styles.serviceNotice, { backgroundColor: themeColors.brandSubtle }]}>
               <Text selectable style={[styles.serviceNoticeTitle, { color: themeColors.brand }]}>{t('proComingSoonBadge')}</Text>
               <Text selectable style={[styles.serviceNoticeText, { color: themeColors.textSecondary }]}>{t('proComingSoonDescription')}</Text>
             </View>
           ) : null}
 
           <View style={styles.planGrid}>
-            <View style={[styles.planCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+            <View style={[styles.planCard, { backgroundColor: themeColors.backgroundElement }]}>
               <Text selectable style={[styles.planName, { color: themeColors.text }]}>{t('proMonthlyPlan')}</Text>
               <Text selectable style={[styles.planPrice, { color: themeColors.brand }]}>{t('proMonthlyPrice')}</Text>
               <Text selectable style={[styles.planMeta, { color: themeColors.textSecondary }]}>{t('proMonthlyBenefitRelay')}</Text>
               <Text selectable style={[styles.planMeta, { color: themeColors.textSecondary }]}>{t('proMonthlyBenefitPrompts')}</Text>
             </View>
 
-            <View style={[styles.planCard, styles.recommendedPlan, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.brand }]}>
+            <View style={[styles.planCard, styles.recommendedPlan, { backgroundColor: themeColors.brandSubtle }]}>
               <Text selectable style={[styles.recommendedLabel, { color: themeColors.brand }]}>{t('proRecommended')}</Text>
               <Text selectable style={[styles.planName, { color: themeColors.text }]}>{t('proLifetimePlan')}</Text>
               <Text selectable style={[styles.planPrice, { color: themeColors.brand }]}>{t('proLifetimePrice')}</Text>
@@ -170,7 +170,7 @@ export function ProPaywallModal({
             onPress={() => void handlePurchase()}
             style={[
               styles.purchaseButton,
-              { borderColor: themeColors.brand },
+              { backgroundColor: themeColors.brandSubtle },
               !canPurchase && styles.buttonDisabled,
             ]}
           >
@@ -191,29 +191,18 @@ export function ProPaywallModal({
               placeholder={t('proLicenseKeyPlaceholder')}
               placeholderTextColor={themeColors.textMuted}
               returnKeyType="done"
-              style={[styles.input, { color: themeColors.text, backgroundColor: themeColors.composerBg, borderColor: themeColors.composerBorder }]}
+              style={[styles.input, { color: themeColors.text, backgroundColor: themeColors.composerBg }]}
               value={licenseKey}
             />
             {activationError ? <Text selectable style={styles.errorText}>{activationError}</Text> : null}
-            <TouchableOpacity
-              accessibilityRole="button"
+            <GradientButton
               accessibilityLabel={activationAvailable ? t('proActivateLicense') : t('proComingSoonAction')}
               disabled={isActivating || !activationAvailable}
+              loading={isActivating}
+              title={activationAvailable ? t('proActivateLicense') : t('proComingSoonAction')}
               onPress={() => void handleActivate()}
-              style={[
-                styles.activateButton,
-                { backgroundColor: themeColors.brand },
-                (isActivating || !activationAvailable) && styles.buttonDisabled,
-              ]}
-            >
-              {isActivating ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.activateButtonText}>
-                  {activationAvailable ? t('proActivateLicense') : t('proComingSoonAction')}
-                </Text>
-              )}
-            </TouchableOpacity>
+              style={styles.activateButton}
+            />
           </View>
         </ScrollView>
       </RNHostView>
@@ -242,7 +231,7 @@ const styles = StyleSheet.create({
   closeButton: {
     width: 36,
     height: 36,
-    borderRadius: 0,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -266,14 +255,11 @@ const styles = StyleSheet.create({
   planCard: {
     flex: 1,
     minHeight: 170,
-    borderWidth: 1,
-    borderRadius: 0,
+    borderRadius: 8,
     padding: 14,
     gap: 8,
   },
-  recommendedPlan: {
-    borderWidth: 2,
-  },
+  recommendedPlan: {},
   recommendedLabel: {
     fontSize: 11,
     fontWeight: '800',
@@ -291,8 +277,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   serviceNotice: {
-    borderWidth: 1,
-    borderRadius: 0,
+    borderRadius: 8,
     padding: 12,
     gap: 4,
   },
@@ -306,8 +291,7 @@ const styles = StyleSheet.create({
   },
   purchaseButton: {
     minHeight: 44,
-    borderRadius: 0,
-    borderWidth: 1,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -324,8 +308,7 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 46,
-    borderRadius: 0,
-    borderWidth: 1,
+    borderRadius: 8,
     paddingHorizontal: 14,
     fontSize: 15,
     fontWeight: '700',
@@ -337,7 +320,7 @@ const styles = StyleSheet.create({
   },
   activateButton: {
     minHeight: 46,
-    borderRadius: 0,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -4,6 +4,21 @@ All notable changes to JulesMe are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.14] - 2026-09-07
+
+### Added
+
+- **JulesMe Pro Privileges & Badges**: Added golden gradient breathing `ProBadge` with dedicated privileges modal, animated `BreathingLogo`, and high-texture `GradientButton`.
+- **Custom Prompt Library**: Added `CustomPromptsModal` and persistent storage for user-defined task prompt templates, accessible via task chips and chat shortcut bar.
+- **Global Coding Instructions**: Added customizable rules and coding conventions in Settings that automatically inject into Jules task instructions.
+- **Security & Key Management**: Added visibility toggle (show/hide) for Jules API Key in settings.
+
+### Changed
+
+- **Copywriting & Design Tone Polish**: Refined UI copywriting and emoji usage across Chinese (Simplified/Traditional) and English locales to follow a restrained, professional developer tool aesthetic (removed distracting emojis from primary CTA buttons, status labels, and paywall plans, while preserving warm empty-state motifs).
+- **Theme & App Assets**: Updated brand launcher icons, adaptive icons, and styling constants.
+- Advanced the Expo version to `1.1.14`, iOS build number to `24`, and Android version code to `24`.
+
 ## [1.1.13] - 2026-09-04
 
 ### Changed

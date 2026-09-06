@@ -45,6 +45,10 @@ import {
 } from '../utils/jules-guards';
 import type { ImageAttachment, ImageAttachmentResult } from '../utils/jules-guards';
 import { getApiKey } from '../utils/secure-store';
+import { GradientButton } from '../components/gradient-button';
+import { usePro } from '../hooks/use-pro';
+import { ProBadge } from '../components/pro-badge';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type TimelineKind = 'user' | 'agent' | 'plan' | 'progress' | 'approved' | 'completed' | 'failed' | 'system';
 
@@ -227,6 +231,7 @@ export default function ChatScreen() {
   const sourceId = getSingleRouteParam(routeSourceId);
   const startingBranch = getSingleRouteParam(routeStartingBranch);
 
+  const { proState } = usePro();
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -528,6 +533,12 @@ export default function ChatScreen() {
   const terminal = isTerminalState(activeState);
   const canSend = Boolean((inputText.trim() || selectedImage) && apiKey && (sessionId || (sourceId && startingBranch)) && !isSending);
 
+  useEffect(() => {
+    if (activeState === 'COMPLETED' && proState.isPro) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  }, [activeState, proState.isPro]);
+
   const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -669,7 +680,7 @@ export default function ChatScreen() {
     if (artifact.changeSet?.gitPatch) {
       const patch = artifact.changeSet.gitPatch;
       return (
-        <View key={artifactId} style={[styles.artifactCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+        <View key={artifactId} style={[styles.artifactCard, { backgroundColor: themeColors.chipBg }]}>
           <View style={styles.artifactHeader}>
             <TouchableOpacity accessibilityRole="button" onPress={() => toggleArtifact(artifactId)} style={styles.artifactHeaderCopy}>
               <Text style={[styles.artifactTitle, { color: themeColors.text }]}>{t('codeChanges')}</Text>
@@ -700,7 +711,7 @@ export default function ChatScreen() {
 
     if (artifact.bashOutput) {
       return (
-        <View key={artifactId} style={[styles.artifactCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+        <View key={artifactId} style={[styles.artifactCard, { backgroundColor: themeColors.chipBg }]}>
           <View style={styles.artifactHeader}>
             <TouchableOpacity accessibilityRole="button" onPress={() => toggleArtifact(artifactId)} style={styles.artifactHeaderCopy}>
               <Text style={[styles.artifactTitle, { color: themeColors.text }]}>{t('commandOutput')}</Text>
@@ -735,7 +746,7 @@ export default function ChatScreen() {
       const isImage = artifact.media.mimeType.startsWith('image/');
       const mediaUri = `data:${artifact.media.mimeType};base64,${artifact.media.data}`;
       return (
-        <View key={artifactId} style={[styles.artifactCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+        <View key={artifactId} style={[styles.artifactCard, { backgroundColor: themeColors.chipBg }]}>
           <Text style={[styles.artifactTitle, { color: themeColors.text }]}>{isImage ? t('generatedImage') : t('generatedMedia')}</Text>
           <Text style={[styles.artifactMeta, { color: themeColors.textSecondary }]}>{artifact.media.mimeType}</Text>
           {isImage ? (
@@ -760,7 +771,7 @@ export default function ChatScreen() {
       const isMessageCopied = copiedMessageId === item.id;
 
       return (
-        <View style={[styles.messageBubble, isUser ? [styles.userBubble, { backgroundColor: themeColors.brand }] : [styles.agentBubble, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]]}>
+        <View style={[styles.messageBubble, isUser ? [styles.userBubble, { backgroundColor: themeColors.brand }] : [styles.agentBubble, { backgroundColor: themeColors.backgroundElement }]]}>
           {item.images?.map((imageUri, index) => (
             <TouchableOpacity
               key={`${item.id}-img-${index}`}
@@ -805,7 +816,7 @@ export default function ChatScreen() {
     if (item.kind === 'plan') {
       const steps = item.plan?.steps || [];
       return (
-        <View style={[styles.eventCard, styles.planCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+        <View style={[styles.eventCard, styles.planCard, { backgroundColor: themeColors.backgroundElement }]}>
           <View style={styles.eventMetaRow}>
             <Text style={[styles.eventEyebrow, { color: themeColors.brand }]}>{t('planGenerated')}</Text>
             <Text style={[styles.eventTime, { color: themeColors.textSecondary }]}>{formatActivityTime(item.timestamp, t)}</Text>
@@ -843,9 +854,13 @@ export default function ChatScreen() {
           })}
           {waitingForPlan ? (
             <View style={styles.planActions}>
-              <TouchableOpacity style={[styles.approveButton, { backgroundColor: themeColors.brand }]} onPress={handleApprovePlan} disabled={isApproving}>
-                {isApproving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.approveButtonText}>{t('approveAndRun')}</Text>}
-              </TouchableOpacity>
+              <GradientButton
+                disabled={isApproving}
+                loading={isApproving}
+                title={t('approveAndRun')}
+                onPress={handleApprovePlan}
+                style={styles.approveButton}
+              />
             </View>
           ) : null}
         </View>
@@ -853,12 +868,12 @@ export default function ChatScreen() {
     }
 
     const cardToneStyle = {
-      progress: { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder },
-      approved: { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder },
-      completed: { backgroundColor: themeColors.statusCompleteBg, borderColor: themeColors.cardBorder },
-      failed: { backgroundColor: themeColors.statusFailedBg, borderColor: themeColors.cardBorder },
-      system: { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder },
-    }[item.kind] || { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder };
+      progress: { backgroundColor: themeColors.backgroundElement },
+      approved: { backgroundColor: themeColors.brandSubtle },
+      completed: { backgroundColor: themeColors.statusCompleteBg },
+      failed: { backgroundColor: themeColors.statusFailedBg },
+      system: { backgroundColor: themeColors.backgroundElement },
+    }[item.kind] || { backgroundColor: themeColors.backgroundElement };
 
     return (
       <View style={[styles.eventCard, cardToneStyle]}>
@@ -887,7 +902,7 @@ export default function ChatScreen() {
   };
 
   const listFooter = activitiesNextPageToken ? (
-    <TouchableOpacity style={[styles.historyButton, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]} onPress={loadOlderActivities} disabled={isLoadingHistory}>
+    <TouchableOpacity style={[styles.historyButton, { backgroundColor: themeColors.backgroundElement }]} onPress={loadOlderActivities} disabled={isLoadingHistory}>
       {isLoadingHistory ? <ActivityIndicator size="small" color={themeColors.brand} /> : <Text style={[styles.historyButtonText, { color: themeColors.brand }]}>{t('loadOlderActivities')}</Text>}
     </TouchableOpacity>
   ) : null;
@@ -895,7 +910,7 @@ export default function ChatScreen() {
   return (
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: themeColors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardView}>
-        <View style={[styles.header, { backgroundColor: themeColors.topBar, borderBottomColor: themeColors.topBarBorder }]}>
+        <View style={[styles.header, { backgroundColor: themeColors.topBar }]}>
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={t('back')}
@@ -906,9 +921,12 @@ export default function ChatScreen() {
           </TouchableOpacity>
           <Image source={require('@/assets/images/jules-logo.png')} style={styles.headerLogo} />
           <View style={styles.headerCopy}>
-            <Text style={[styles.headerContext, { color: themeColors.textSecondary }]} numberOfLines={1}>
-              {displaySource} · {startingBranch || session?.sourceContext?.githubRepoContext?.startingBranch || t('selectedBranch')}
-            </Text>
+            <View style={styles.headerContextRow}>
+              <Text style={[styles.headerContext, { color: themeColors.textSecondary }]} numberOfLines={1}>
+                {displaySource} · {startingBranch || session?.sourceContext?.githubRepoContext?.startingBranch || t('selectedBranch')}
+              </Text>
+              {proState.isPro ? <ProBadge tier={proState.tier} style={{ marginLeft: 6 }} /> : null}
+            </View>
             <Text style={[styles.headerTitle, { color: themeColors.text }]} numberOfLines={1}>
               {session?.title || cleanPromptDisplay(session?.prompt) || t('workbench')}
             </Text>
@@ -919,7 +937,7 @@ export default function ChatScreen() {
         </View>
 
         {waitingForPlan || waitingForFeedback ? (
-          <View style={[styles.attentionBanner, { backgroundColor: themeColors.statusAttentionBg, borderBottomColor: themeColors.cardBorder }]}>
+          <View style={[styles.attentionBanner, { backgroundColor: themeColors.statusAttentionBg }]}>
             <Text style={[styles.attentionBannerText, { color: themeColors.statusAttentionText }]}>
               {waitingForPlan ? t('planReadyBanner') : t('feedbackBanner')}
             </Text>
@@ -958,7 +976,7 @@ export default function ChatScreen() {
                 const parsed = parseMessageContent(session.prompt);
                 if (!parsed.text && parsed.images.length === 0) return null;
                 return (
-                  <View style={[styles.taskSummary, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}>
+                  <View style={[styles.taskSummary, { backgroundColor: themeColors.brandSubtle }]}>
                     <Text style={[styles.taskSummaryLabel, { color: themeColors.brand }]}>{t('taskGoal')}</Text>
                     {parsed.images.map((imageUri, index) => (
                       <TouchableOpacity
@@ -996,15 +1014,68 @@ export default function ChatScreen() {
                     </View>
                   ) : null}
                   {firstPullRequest ? (
-                    <TouchableOpacity
-                      accessibilityRole="button"
+                    <GradientButton
                       accessibilityLabel={t('openPullRequest')}
+                      title={t('openPullRequest')}
+                      gradientColors={['#22C55E', '#15803D']}
                       style={styles.deliveryPrimaryAction}
                       onPress={() => void handleOpenExternalLink(firstPullRequest.url)}
-                    >
-                      <Text style={styles.deliveryPrimaryActionText}>{t('openPullRequest')}</Text>
-                    </TouchableOpacity>
+                    />
                   ) : null}
+                </View>
+              ) : null}
+
+              {terminal && activeState === 'COMPLETED' && proState.isPro ? (
+                <View style={[styles.proReportCard, { backgroundColor: themeColors.card }]}>
+                  <View style={styles.proReportHeader}>
+                    <LinearGradient
+                      colors={['#F59E0B', '#D97706']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.proReportBadge}
+                    >
+                      <Text style={styles.proReportBadgeText}>✦ PRO VIP</Text>
+                    </LinearGradient>
+                    <Text style={[styles.proReportTitle, { color: themeColors.text }]}>
+                      {t('proAchievementCardTitle')}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.proReportStatsRow, { backgroundColor: themeColors.backgroundElement }]}>
+                    <View style={styles.proReportStat}>
+                      <Text style={[styles.proReportStatNum, { color: themeColors.brand }]}>
+                        {deliveryMetrics.changeSets}
+                      </Text>
+                      <Text style={[styles.proReportStatLabel, { color: themeColors.textSecondary }]}>
+                        变更文件
+                      </Text>
+                    </View>
+                    <View style={styles.proReportStat}>
+                      <Text style={[styles.proReportStatNum, { color: '#10B981' }]}>
+                        {deliveryMetrics.successfulCommands}
+                      </Text>
+                      <Text style={[styles.proReportStatLabel, { color: themeColors.textSecondary }]}>
+                        通过命令
+                      </Text>
+                    </View>
+                    <View style={styles.proReportStat}>
+                      <Text style={[styles.proReportStatNum, { color: '#F59E0B' }]}>
+                        ~{Math.max(0.5, Math.round((deliveryMetrics.changeSets * 0.4 + 0.5) * 10) / 10)}h
+                      </Text>
+                      <Text style={[styles.proReportStatLabel, { color: themeColors.textSecondary }]}>
+                        节省工时
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.proReportFooter}>
+                    <Text style={[styles.proReportPerkTitle, { color: themeColors.text }]}>
+                      {t('proAchievementCoffeeTitle')}
+                    </Text>
+                    <Text style={[styles.proReportPerkDesc, { color: themeColors.textSecondary }]}>
+                      {t('proAchievementCoffeeDesc')}
+                    </Text>
+                  </View>
                 </View>
               ) : null}
             </View>
@@ -1098,7 +1169,7 @@ export default function ChatScreen() {
                   <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>🐛 {t('promptFixBugChip')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
+                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle }]}
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setInputText('为刚才涉及的核心业务逻辑补充单元测试');
@@ -1107,7 +1178,7 @@ export default function ChatScreen() {
                   <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>🧪 {t('promptAddTestsChip')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
+                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle }]}
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setInputText('优化这部分代码的性能和可读性，进行精简重构');
@@ -1116,7 +1187,7 @@ export default function ChatScreen() {
                   <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>⚡ {t('promptRefactorChip')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
+                  style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle }]}
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setInputText('请详细解释这段代码的核心逻辑和执行流程');
@@ -1142,7 +1213,7 @@ export default function ChatScreen() {
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={t('attachImage')}
-                style={[styles.attachButton, { backgroundColor: themeColors.composerBg, borderColor: themeColors.composerBorder }]}
+                style={[styles.attachButton, { backgroundColor: themeColors.composerBg }]}
                 onPress={handlePickImage}
                 disabled={isSending}
               >
@@ -1150,7 +1221,7 @@ export default function ChatScreen() {
               </TouchableOpacity>
               <TextInput
                 accessibilityLabel={t('sendMessageToJules')}
-                style={[styles.composerInput, { backgroundColor: themeColors.composerBg, borderColor: themeColors.composerBorder, color: themeColors.text }]}
+                style={[styles.composerInput, { backgroundColor: themeColors.composerBg, color: themeColors.text }]}
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder={waitingForPlan ? t('adjustPlanPlaceholder') : t('replyPlaceholder')}
@@ -1159,15 +1230,15 @@ export default function ChatScreen() {
                 textAlignVertical="top"
                 maxLength={2000}
               />
-              <TouchableOpacity
-                accessibilityRole="button"
+              <GradientButton
                 accessibilityLabel={t('sendMessage')}
                 disabled={!canSend}
-                style={[styles.sendButton, { backgroundColor: themeColors.brand }, !canSend && styles.sendButtonDisabled]}
+                loading={isSending}
+                title={t('send')}
                 onPress={handleSend}
-              >
-                {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.sendButtonText}>{t('send')}</Text>}
-              </TouchableOpacity>
+                style={styles.sendButton}
+                contentStyle={styles.sendButtonContent}
+              />
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1205,54 +1276,55 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   keyboardView: { flex: 1 },
-  header: { minHeight: 64, paddingHorizontal: 14, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  backButton: { width: 34, height: 34, borderRadius: 0, alignItems: 'center', justifyContent: 'center' },
+  header: { minHeight: 64, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  backButton: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   backButtonText: { fontSize: 24, lineHeight: 26, fontWeight: '700', marginTop: -2 },
-  headerLogo: { width: 28, height: 28, borderRadius: 0 },
+  headerLogo: { width: 34, height: 34, borderRadius: 8 },
   headerCopy: { flex: 1, minWidth: 0, paddingHorizontal: 2 },
+  headerContextRow: { flexDirection: 'row', alignItems: 'center' },
   headerContext: { fontSize: 11, lineHeight: 15, fontWeight: '700' },
   headerTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800' },
-  statusChip: { minHeight: 28, maxWidth: 98, borderRadius: 0, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center' },
+  statusChip: { minHeight: 28, maxWidth: 98, borderRadius: 6, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center' },
   statusChipText: { fontSize: 10, lineHeight: 14, fontWeight: '800', textAlign: 'center', letterSpacing: 0.3, textTransform: 'uppercase' },
-  attentionBanner: { paddingHorizontal: 18, paddingVertical: 10, borderBottomWidth: 1 },
+  attentionBanner: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, marginHorizontal: 16, marginTop: 8 },
   attentionBannerText: { fontSize: 13, lineHeight: 18, fontWeight: '700', textAlign: 'center' },
   timelineContent: { padding: 16, paddingBottom: 22, flexGrow: 1, gap: 12 },
   scrollControls: { position: 'absolute', right: 16, zIndex: 2, gap: 8 },
   scrollControlsWithComposer: { bottom: 94 },
   scrollControlsWithTerminalDock: { bottom: 84 },
-  scrollControlButton: { width: 36, height: 36, borderRadius: 0, alignItems: 'center', justifyContent: 'center' },
+  scrollControlButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   scrollControlButtonDisabled: { opacity: 0.35 },
   scrollControlIcon: { color: '#FFFFFF', fontSize: 18, lineHeight: 22, fontWeight: '800' },
   listHeader: { gap: 12 },
-  taskSummary: { borderRadius: 0, padding: 14, borderWidth: 1 },
+  taskSummary: { borderRadius: 8, padding: 14 },
   taskSummaryLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
   taskSummaryText: { fontSize: 14, lineHeight: 21, marginTop: 5, fontWeight: '600' },
   emptyState: { alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 220, paddingHorizontal: 30, gap: 8 },
   emptyStateTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
   emptyStateText: { fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  messageBubble: { maxWidth: '89%', borderRadius: 0, padding: 12, marginVertical: 2 },
-  userBubble: { alignSelf: 'flex-end', borderRadius: 0 },
-  agentBubble: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 0 },
-  messageImage: { width: 220, height: 160, borderRadius: 0, marginBottom: 8, backgroundColor: 'rgba(0,0,0,0.06)' },
-  taskSummaryImage: { width: '100%', height: 140, borderRadius: 0, marginTop: 8, marginBottom: 4, backgroundColor: 'rgba(0,0,0,0.06)' },
+  messageBubble: { maxWidth: '89%', borderRadius: 12, padding: 12, marginVertical: 2 },
+  userBubble: { alignSelf: 'flex-end', borderRadius: 12 },
+  agentBubble: { alignSelf: 'flex-start', borderRadius: 12 },
+  messageImage: { width: 220, height: 160, borderRadius: 8, marginBottom: 8, backgroundColor: 'rgba(0,0,0,0.06)' },
+  taskSummaryImage: { width: '100%', height: 140, borderRadius: 8, marginTop: 8, marginBottom: 4, backgroundColor: 'rgba(0,0,0,0.06)' },
   messageText: { fontSize: 15, lineHeight: 22 },
   userText: { color: '#FFFFFF' },
   agentText: { fontSize: 15, lineHeight: 22 },
   messageTime: { alignSelf: 'flex-end', marginTop: 7, fontSize: 11, lineHeight: 15, fontVariant: ['tabular-nums'] },
   userMessageTime: { color: 'rgba(255,255,255,0.76)' },
   agentMessageTime: { fontSize: 11 },
-  eventCard: { borderRadius: 0, padding: 14, borderWidth: 1, marginVertical: 2 },
-  planCard: { borderWidth: 1 },
-  deliveryCard: { borderRadius: 0, padding: 14, backgroundColor: '#EEFBF3', borderWidth: 1, borderColor: '#C8EFDA' },
-  deliveryCardFailed: { backgroundColor: '#FFF5F5', borderColor: '#FFD9D7' },
+  eventCard: { borderRadius: 8, padding: 14, marginVertical: 3 },
+  planCard: {},
+  deliveryCard: { borderRadius: 8, padding: 16, backgroundColor: '#E7F8EE' },
+  deliveryCardFailed: { backgroundColor: '#FFE8E7' },
   deliveryEyebrow: { color: '#176B3C', fontSize: 11, lineHeight: 15, letterSpacing: 0.7, fontWeight: '800' },
   deliveryEyebrowFailed: { color: '#AE3027' },
   deliveryTitle: { color: '#243B2D', fontSize: 19, lineHeight: 26, fontWeight: '900', marginTop: 3 },
   deliveryText: { color: '#4E6657', fontSize: 14, lineHeight: 20, marginTop: 5 },
   deliveryMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 12 },
-  deliveryMetric: { borderRadius: 0, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#FFFFFF' },
+  deliveryMetric: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'rgba(255,255,255,0.85)' },
   deliveryMetricText: { color: '#43604D', fontSize: 11, lineHeight: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  deliveryPrimaryAction: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 0, backgroundColor: '#25734A', marginTop: 14 },
+  deliveryPrimaryAction: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#197044', marginTop: 14 },
   deliveryPrimaryActionText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   eventMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   eventEyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
@@ -1261,63 +1333,64 @@ const styles = StyleSheet.create({
   eventText: { fontSize: 14, lineHeight: 21, marginTop: 5 },
   planHint: { fontSize: 12, lineHeight: 18, marginTop: 4 },
   planStep: { flexDirection: 'row', gap: 10, paddingTop: 13 },
-  planIndex: { width: 22, height: 22, borderRadius: 0, textAlign: 'center', paddingTop: 2, overflow: 'hidden', fontSize: 11, fontWeight: '800' },
+  planIndex: { width: 22, height: 22, borderRadius: 11, textAlign: 'center', paddingTop: 2, overflow: 'hidden', fontSize: 11, fontWeight: '800' },
   planCopy: { flex: 1 },
   planStepTitle: { fontSize: 14, lineHeight: 20, fontWeight: '800' },
   planStepPreview: { fontSize: 13, lineHeight: 19, marginTop: 3 },
   planDetailButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 2, paddingVertical: 4 },
   planDetailButtonText: { fontSize: 13, fontWeight: '800' },
-  planStepDescription: { fontSize: 13, lineHeight: 20, marginTop: 3, padding: 10, borderRadius: 0 },
+  planStepDescription: { fontSize: 13, lineHeight: 20, marginTop: 3, padding: 10, borderRadius: 6 },
   planActions: { flexDirection: 'row', gap: 10, marginTop: 17 },
-  approveButton: { minHeight: 44, flex: 1.2, borderRadius: 0, alignItems: 'center', justifyContent: 'center' },
+  approveButton: { minHeight: 44, flex: 1.2, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   approveButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  artifactCard: { borderRadius: 0, borderWidth: 1, padding: 10, marginTop: 10 },
+  artifactCard: { borderRadius: 8, padding: 12, marginTop: 10 },
   artifactHeader: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'space-between' },
   artifactHeaderCopy: { flex: 1 },
   artifactTitle: { fontSize: 13, fontWeight: '800' },
   artifactMeta: { fontSize: 12, lineHeight: 17, marginTop: 2 },
   artifactToggle: { fontSize: 12, fontWeight: '800' },
-  exitCode: { borderRadius: 0, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden', fontSize: 10, fontWeight: '800' },
+  exitCode: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden', fontSize: 10, fontWeight: '800' },
   exitCodeSuccess: { color: '#197044', backgroundColor: '#DFF7E9' },
   exitCodeError: { color: '#B42318', backgroundColor: '#FFE5E3' },
-  codeBlock: { marginTop: 10, maxHeight: 240, borderRadius: 0, overflow: 'hidden', backgroundColor: '#28243A', color: '#F4F2FF', padding: 10, fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), fontSize: 11, lineHeight: 16 },
-  artifactImage: { width: '100%', height: 180, borderRadius: 0, marginTop: 10, backgroundColor: '#F4F2FA' },
-  historyButton: { minHeight: 40, borderRadius: 0, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  codeBlock: { marginTop: 10, maxHeight: 240, borderRadius: 8, overflow: 'hidden', backgroundColor: '#28243A', color: '#F4F2FF', padding: 10, fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), fontSize: 11, lineHeight: 16 },
+  artifactImage: { width: '100%', height: 180, borderRadius: 8, marginTop: 10, backgroundColor: '#F4F2FA' },
+  historyButton: { minHeight: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
   historyButtonText: { fontSize: 13, fontWeight: '800' },
-  errorNotice: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#FFF4F3', borderTopWidth: 1, borderTopColor: '#FFD7D2', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  errorNotice: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#FFF4F3', borderRadius: 8, marginHorizontal: 13, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   errorNoticeText: { color: '#AA3027', fontSize: 12, lineHeight: 17, flex: 1 },
   errorNoticeActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  errorNoticeBtn: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 0 },
+  errorNoticeBtn: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
   errorNoticeBtnText: { color: '#B42318', fontSize: 11, fontWeight: '700' },
   errorNoticeClose: { padding: 4 },
   errorNoticeCloseText: { color: '#AA3027', fontSize: 13, fontWeight: '700' },
   workingIndicator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 9 },
   workingIndicatorText: { fontSize: 12, fontWeight: '700' },
-  composerContainer: { borderTopWidth: 1, flexDirection: 'column' },
+  composerContainer: { flexDirection: 'column' },
   imagePreviewContainer: { paddingHorizontal: 13, paddingTop: 10, flexDirection: 'row' },
-  imagePreview: { width: 60, height: 60, borderRadius: 0, backgroundColor: '#F4F2FA' },
-  imagePreviewRemove: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', width: 20, height: 20, borderRadius: 0, alignItems: 'center', justifyContent: 'center' },
+  imagePreview: { width: 60, height: 60, borderRadius: 6, backgroundColor: '#F4F2FA' },
+  imagePreviewRemove: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   imagePreviewRemoveText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
   composerShell: { flexDirection: 'row', alignItems: 'stretch', gap: 10, paddingHorizontal: 13, paddingVertical: 10 },
-  attachButton: { width: 44, minHeight: 52, borderRadius: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  attachButton: { width: 44, minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   attachButtonText: { fontSize: 24, fontWeight: '400', marginTop: -4 },
-  composerInput: { flex: 1, minHeight: 52, maxHeight: 120, borderRadius: 0, borderWidth: 1, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 10, fontSize: 15, lineHeight: 21 },
-  sendButton: { width: 64, minHeight: 52, alignSelf: 'stretch', borderRadius: 0, alignItems: 'center', justifyContent: 'center' },
+  composerInput: { flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 8, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 10, fontSize: 15, lineHeight: 21 },
+  sendButton: { width: 64, minHeight: 48, alignSelf: 'stretch', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  sendButtonContent: { minHeight: 48, paddingHorizontal: 0 },
   sendButtonDisabled: { opacity: 0.4 },
   sendButtonText: { color: '#FFFFFF', fontSize: 13, lineHeight: 18, fontWeight: '800' },
-  terminalDock: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 13, paddingVertical: 10, borderTopWidth: 1 },
+  terminalDock: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 13, paddingVertical: 10 },
   terminalDockCopy: { flex: 1, minWidth: 0 },
   terminalDockTitle: { fontSize: 13, lineHeight: 18, fontWeight: '800' },
   terminalDockText: { fontSize: 11, lineHeight: 16, marginTop: 1 },
-  terminalActionButton: { minWidth: 116, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 0 },
+  terminalActionButton: { minWidth: 116, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8 },
   terminalActionButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   messageFooterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 7 },
-  messageCopyButton: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 0, backgroundColor: 'rgba(0,0,0,0.04)' },
+  messageCopyButton: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.04)' },
   messageCopyText: { fontSize: 11, fontWeight: '700' },
   artifactActionRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  artifactPillButton: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 0 },
+  artifactPillButton: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   artifactPillText: { fontSize: 11, fontWeight: '800' },
-  diffScrollView: { marginTop: 10, borderRadius: 0, overflow: 'hidden', backgroundColor: '#181622', maxHeight: 360 },
+  diffScrollView: { marginTop: 10, borderRadius: 8, overflow: 'hidden', backgroundColor: '#181622', maxHeight: 360 },
   diffContainer: { paddingVertical: 8, minWidth: '100%' },
   diffLine: { paddingHorizontal: 10, paddingVertical: 2, flexDirection: 'row' },
   diffLineAdded: { backgroundColor: 'rgba(34, 197, 94, 0.16)' },
@@ -1332,11 +1405,23 @@ const styles = StyleSheet.create({
   diffTextHeader: { color: '#93C5FD', fontWeight: '700' },
   diffTextNormal: { color: '#E2E8F0' },
   quickPromptsScroll: { paddingHorizontal: 13, paddingTop: 10, paddingBottom: 2, gap: 8 },
-  quickPromptChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 0, borderWidth: 1 },
+  quickPromptChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16 },
   quickPromptText: { fontSize: 12, fontWeight: '700' },
   lightboxBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', alignItems: 'center', justifyContent: 'center' },
-  lightboxCloseButton: { position: 'absolute', top: Platform.OS === 'ios' ? 54 : 32, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: 0, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  lightboxCloseButton: { position: 'absolute', top: Platform.OS === 'ios' ? 54 : 32, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   lightboxCloseButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   lightboxImageWrapper: { width: '100%', height: '80%', alignItems: 'center', justifyContent: 'center' },
   lightboxImage: { width: '92%', height: '100%' },
+  proReportCard: { marginTop: 14, borderRadius: 12, padding: 16, gap: 12 },
+  proReportHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  proReportBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  proReportBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },
+  proReportTitle: { fontSize: 15, fontWeight: '800' },
+  proReportStatsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingVertical: 12, borderRadius: 8 },
+  proReportStat: { alignItems: 'center', gap: 2 },
+  proReportStatNum: { fontSize: 18, fontWeight: '900' },
+  proReportStatLabel: { fontSize: 11, fontWeight: '700' },
+  proReportFooter: { gap: 3, paddingTop: 4 },
+  proReportPerkTitle: { fontSize: 13, fontWeight: '800' },
+  proReportPerkDesc: { fontSize: 12, lineHeight: 17 },
 });

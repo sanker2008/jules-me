@@ -14,17 +14,62 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProPaywallModal } from '../components/pro-paywall-modal';
+import { Chevron } from '../components/chevron';
+import { GradientButton } from '../components/gradient-button';
+import { ProBadge } from '../components/pro-badge';
+import { getGlobalInstructions, saveGlobalInstructions } from '../utils/pro-storage';
 import { usePro } from '../hooks/use-pro';
 import { createTranslator, getLanguageName, getThemeName, languageOptions, useAppLanguage } from '../i18n';
 import { themeOptions, useAppTheme } from '../theme';
 import { useTheme } from '../hooks/use-theme';
 import { getApiKey, saveApiKey } from '../utils/secure-store';
+import { getSources, JulesApiError } from '../services/api';
 import {
   IS_PRO_ACTIVATION_AVAILABLE,
   IS_PRO_PURCHASE_AVAILABLE,
   PRO_PURCHASE_URL,
 } from '../utils/license';
 import { maskLicenseKey } from '../utils/license-state';
+
+function EyeIcon({ visible, color }: { visible: boolean; color: string }) {
+  return (
+    <View style={eyeStyles.wrapper}>
+      <View style={[eyeStyles.eyeShape, { borderColor: color }]}>
+        <View style={[eyeStyles.pupil, { backgroundColor: color }]} />
+      </View>
+      {!visible && <View style={[eyeStyles.slash, { backgroundColor: color }]} />}
+    </View>
+  );
+}
+
+const eyeStyles = StyleSheet.create({
+  wrapper: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyeShape: {
+    width: 20,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pupil: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  slash: {
+    position: 'absolute',
+    width: 20,
+    height: 1.5,
+    borderRadius: 1,
+    transform: [{ rotate: '-45deg' }],
+  },
+});
 
 function getRemainingProDays(expiresAt: number | null | undefined): number {
   if (typeof expiresAt !== 'number') return 0;
@@ -40,11 +85,19 @@ export default function SettingsScreen() {
   const t = useMemo(() => createTranslator(language), [language]);
 
   const [draftApiKey, setDraftApiKey] = useState('');
-  const [savedStatus, setSavedStatus] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showProPaywall, setShowProPaywall] = useState(false);
   const [proStatus, setProStatus] = useState<string | null>(null);
+  const [globalInstructions, setGlobalInstructions] = useState('');
+  const [isSavingInstructions, setIsSavingInstructions] = useState(false);
+  const [instructionsFeedback, setInstructionsFeedback] = useState<string | null>(null);
 
   const appVersion = Constants.expoConfig?.version ?? '1.0.1';
   const buildNumber = Constants.expoConfig?.ios?.buildNumber
@@ -60,17 +113,57 @@ export default function SettingsScreen() {
     void getApiKey().then(key => {
       if (key) setDraftApiKey(key);
     });
+    void getGlobalInstructions().then(setGlobalInstructions);
   }, []);
+
+  const handleSaveInstructions = async () => {
+    setIsSavingInstructions(true);
+    await saveGlobalInstructions(globalInstructions);
+    setIsSavingInstructions(false);
+    setInstructionsFeedback(t('instructionsSaved'));
+    setTimeout(() => setInstructionsFeedback(null), 2500);
+  };
 
   const handleSaveApiKey = async () => {
     const nextApiKey = draftApiKey.trim();
-    await saveApiKey(nextApiKey);
-    setSavedStatus(t('saveAndConnect'));
-    setTimeout(() => setSavedStatus(null), 2000);
+    if (!nextApiKey) {
+      await saveApiKey('');
+      setConnectionStatus({
+        type: 'error',
+        message: t('apiKeyEmpty'),
+      });
+      return;
+    }
+
+    setIsConnecting(true);
+    setConnectionStatus(null);
+
+    try {
+      await getSources(nextApiKey);
+      await saveApiKey(nextApiKey);
+      setConnectionStatus({
+        type: 'success',
+        message: t('connectSuccess'),
+      });
+    } catch (error) {
+      await saveApiKey(nextApiKey);
+      const detail = error instanceof JulesApiError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : t('connectFailed');
+      setConnectionStatus({
+        type: 'error',
+        message: `${t('connectFailed')}: ${detail}`,
+      });
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const handleClearApiKey = () => {
     setDraftApiKey('');
+    setConnectionStatus(null);
   };
 
   const handleDeactivatePro = async () => {
@@ -89,12 +182,12 @@ export default function SettingsScreen() {
       ? t('proPurchase')
       : t('proComingSoonAction');
   const proCardColors = theme === 'dark'
-    ? { backgroundColor: isProActive ? '#1F1A38' : '#35270F', borderLeftColor: isProActive ? '#8374F5' : '#E09F3E' }
-    : { backgroundColor: isProActive ? '#F5F2FF' : '#FFF8E8', borderLeftColor: isProActive ? '#6656D7' : '#D9822B' };
+    ? { backgroundColor: isProActive ? '#1F1A38' : '#35270F' }
+    : { backgroundColor: isProActive ? '#F5F2FF' : '#FFF8E8' };
 
   return (
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: themeColors.background }]}>
-      <View style={[styles.topBar, { backgroundColor: themeColors.topBar, borderBottomColor: themeColors.topBarBorder }]}>
+      <View style={[styles.topBar, { backgroundColor: themeColors.topBar }]}>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={t('back')}
@@ -107,12 +200,283 @@ export default function SettingsScreen() {
         <View style={styles.topBarCenter}>
           <Image source={require('@/assets/images/jules-logo.png')} style={styles.topBarLogo} />
           <Text style={[styles.topBarTitle, { color: themeColors.text }]}>{t('settings')}</Text>
+          {isProActive ? <ProBadge tier={proState.tier} style={{ marginLeft: 6 }} /> : null}
         </View>
 
         <View style={styles.topBarSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {/* API Key Section */}
+        <View style={styles.card}>
+          <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
+          <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{apiKeyStorageDescription}</Text>
+
+          <Text style={[styles.inputLabel, { color: themeColors.text }]}>Jules API Key</Text>
+          <View style={[styles.inputRow, { backgroundColor: themeColors.composerBg }]}>
+            <TextInput
+              accessibilityLabel="Jules API Key"
+              style={[styles.input, { color: themeColors.text }]}
+              value={draftApiKey}
+              onChangeText={text => {
+                setDraftApiKey(text);
+                if (connectionStatus) setConnectionStatus(null);
+              }}
+              placeholder={t('pasteApiKey')}
+              placeholderTextColor={themeColors.textMuted}
+              secureTextEntry={!showApiKey}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {draftApiKey ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('clearApiKey')}
+                style={styles.inputIconButton}
+                onPress={handleClearApiKey}
+              >
+                <Text style={[styles.clearButtonText, { color: themeColors.textSecondary }]}>×</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={showApiKey ? t('hideApiKey') : t('showApiKey')}
+              style={styles.inputIconButton}
+              onPress={() => setShowApiKey(current => !current)}
+            >
+              <EyeIcon visible={showApiKey} color={showApiKey ? themeColors.brand : themeColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <GradientButton
+            disabled={isConnecting}
+            loading={isConnecting}
+            loadingText={t('connecting')}
+            title={t('saveAndConnect')}
+            accessibilityLabel={isConnecting ? t('connecting') : t('saveAndConnect')}
+            onPress={handleSaveApiKey}
+            style={styles.saveButton}
+          />
+
+          {connectionStatus ? (
+            <View
+              style={[
+                styles.statusBanner,
+                {
+                  backgroundColor: connectionStatus.type === 'success'
+                    ? (theme === 'dark' ? '#143823' : '#E7F8EE')
+                    : (theme === 'dark' ? '#3B191B' : '#FFE8E7'),
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusBannerText,
+                  {
+                    color: connectionStatus.type === 'success'
+                      ? (theme === 'dark' ? '#5CE091' : '#177B41')
+                      : (theme === 'dark' ? '#FF8585' : '#D1242F'),
+                  },
+                ]}
+              >
+                {connectionStatus.type === 'success' ? '✓ ' : '✕ '}
+                {connectionStatus.message}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Theme Preference Section */}
+        <View style={styles.card}>
+          <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('theme')}</Text>
+          <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('themeDescription')}</Text>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('theme')}
+            accessibilityState={{ expanded: showThemeMenu }}
+            style={[
+              styles.selectBox,
+              { backgroundColor: themeColors.composerBg },
+            ]}
+            onPress={() => {
+              setShowThemeMenu(current => !current);
+              setShowLanguageMenu(false);
+            }}
+          >
+            <Text style={[styles.selectBoxText, { color: themeColors.text }]}>{getThemeName(themePreference, t)}</Text>
+            <Chevron direction={showThemeMenu ? 'up' : 'down'} color={themeColors.brand} />
+          </TouchableOpacity>
+
+          {showThemeMenu ? (
+            <View style={[styles.menuList, { backgroundColor: themeColors.card }]}>
+              {themeOptions.map(option => (
+                <TouchableOpacity
+                  key={option}
+                  accessibilityRole="menuitem"
+                  accessibilityState={{ selected: themePreference === option }}
+                  style={[
+                    styles.menuItem,
+                    themePreference === option && { backgroundColor: themeColors.brandSubtle },
+                  ]}
+                  onPress={() => {
+                    setShowThemeMenu(false);
+                    void setThemePreference(option);
+                  }}
+                >
+                  <Text style={[styles.menuItemText, { color: themePreference === option ? themeColors.brand : themeColors.text }]}>
+                    {getThemeName(option, t)}
+                  </Text>
+                  {themePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.brand }]}>✓</Text> : null}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+        </View>
+
+        {/* Language Preference Section */}
+        <View style={styles.card}>
+          <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('language')}</Text>
+          <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('languageDescription')}</Text>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('language')}
+            accessibilityState={{ expanded: showLanguageMenu }}
+            style={[
+              styles.selectBox,
+              { backgroundColor: themeColors.composerBg },
+            ]}
+            onPress={() => {
+              setShowLanguageMenu(current => !current);
+              setShowThemeMenu(false);
+            }}
+          >
+            <Text style={[styles.selectBoxText, { color: themeColors.text }]}>{getLanguageName(languagePreference)}</Text>
+            <Chevron direction={showLanguageMenu ? 'up' : 'down'} color={themeColors.brand} />
+          </TouchableOpacity>
+
+          {showLanguageMenu ? (
+            <View style={[styles.menuList, { backgroundColor: themeColors.card }]}>
+              {languageOptions.map(option => (
+                <TouchableOpacity
+                  key={option}
+                  accessibilityRole="menuitem"
+                  accessibilityState={{ selected: languagePreference === option }}
+                  style={[
+                    styles.menuItem,
+                    languagePreference === option && { backgroundColor: themeColors.brandSubtle },
+                  ]}
+                  onPress={() => {
+                    setShowLanguageMenu(false);
+                    void setLanguagePreference(option);
+                  }}
+                >
+                  <Text style={[styles.menuItemText, { color: languagePreference === option ? themeColors.brand : themeColors.text }]}>
+                    {getLanguageName(option)}
+                  </Text>
+                  {languagePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.brand }]}>✓</Text> : null}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+        </View>
+
+        {/* Jules Custom Instructions (Pro Exclusive) */}
+        <View style={styles.card}>
+          <View style={styles.instructionsHeaderRow}>
+            <Text style={[styles.cardTitle, { color: themeColors.text }]}>
+              {t('globalInstructionsCardTitle')}
+            </Text>
+            {!isProActive ? (
+              <TouchableOpacity
+                onPress={() => setShowProPaywall(true)}
+                style={[styles.proLockBadge, { backgroundColor: themeColors.brandSubtle }]}
+              >
+                <Text style={[styles.proLockBadgeText, { color: themeColors.brand }]}>
+                  ✦ PRO
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>
+            {t('globalInstructionsCardDesc')}
+          </Text>
+
+          <TextInput
+            style={[styles.instructionsInput, { color: themeColors.text, backgroundColor: themeColors.composerBg }]}
+            placeholder={t('globalInstructionsInputPlaceholder')}
+            placeholderTextColor={themeColors.textMuted}
+            value={globalInstructions}
+            onChangeText={setGlobalInstructions}
+            editable={isProActive}
+            multiline
+            textAlignVertical="top"
+            maxLength={1000}
+          />
+
+          {isProActive ? (
+            <View style={styles.instructionsActions}>
+              {instructionsFeedback ? (
+                <Text style={[styles.instructionsFeedback, { color: themeColors.brand }]}>
+                  ✓ {instructionsFeedback}
+                </Text>
+              ) : <View />}
+              <GradientButton
+                title={t('saveInstructions')}
+                loading={isSavingInstructions}
+                onPress={handleSaveInstructions}
+                style={styles.saveInstructionsBtn}
+              />
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => setShowProPaywall(true)}
+              style={[styles.unlockProBanner, { backgroundColor: themeColors.brandSubtle }]}
+            >
+              <Text style={[styles.unlockProBannerText, { color: themeColors.brand }]}>
+                {t('proLockedFeatureNotice')} · 点击升级解锁 →
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* About JulesMe Section */}
+        <View style={styles.card}>
+          <View style={styles.aboutHeaderRow}>
+            <Image source={require('@/assets/images/jules-logo.png')} style={styles.aboutLogo} />
+            <View style={styles.aboutHeaderCopy}>
+              <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('aboutJulesMe')}</Text>
+              <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('aboutSubtitle', brand)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoList}>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{t('appVersion')}</Text>
+              <Text style={[styles.infoValue, { color: themeColors.text }]}>v{appVersion} ({t('build')} {buildNumber})</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{t('brand')}</Text>
+              <Text style={[styles.infoValue, { color: themeColors.text }]}>{brand}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{t('author')}</Text>
+              <Text style={[styles.infoValue, { color: themeColors.text }]}>{author}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{t('dataPrivacy')}</Text>
+              <Text style={[styles.infoValue, { color: themeColors.text }]}>{apiKeyStorageDescription}</Text>
+            </View>
+          </View>
+
+          <View style={styles.releaseNotes}>
+            <Text style={[styles.releaseNotesTitle, { color: themeColors.text }]}>{t('releaseNotesTitle')}</Text>
+            <Text style={[styles.releaseNotesText, { color: themeColors.textSecondary }]}>{t('releaseNotesText')}</Text>
+          </View>
+        </View>
+
+        {/* JulesMe Pro Section */}
         <View style={[styles.proCard, proCardColors]}>
           {isProLoading ? (
             <View style={styles.proLoading}>
@@ -132,7 +496,7 @@ export default function SettingsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('proDeactivateThisDevice')}
                 onPress={() => void handleDeactivatePro()}
-                style={[styles.proSecondaryButton, { borderColor: themeColors.brand }]}
+                style={[styles.proSecondaryButton, { backgroundColor: themeColors.brandSubtle }]}
               >
                 <Text style={[styles.proSecondaryButtonText, { color: themeColors.brand }]}>{t('proDeactivateThisDevice')}</Text>
               </TouchableOpacity>
@@ -148,192 +512,17 @@ export default function SettingsScreen() {
               <Text selectable style={[styles.cardDescription, { color: themeColors.textSecondary }]}>
                 {proStatus || (isProEntryAvailable ? t('proFreeDescription') : t('proComingSoonDescription'))}
               </Text>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={proEntryLabel}
+              <GradientButton
                 disabled={!isProEntryAvailable}
+                title={proEntryLabel}
+                accessibilityLabel={proEntryLabel}
                 onPress={() => {
                   if (isProEntryAvailable) setShowProPaywall(true);
                 }}
-                style={[
-                  styles.proPrimaryButton,
-                  { backgroundColor: themeColors.brand },
-                  !isProEntryAvailable && styles.proButtonDisabled,
-                ]}
-              >
-                <Text style={styles.saveButtonText}>
-                  {proEntryLabel}
-                </Text>
-              </TouchableOpacity>
+                style={styles.proPrimaryButton}
+              />
             </>
           )}
-        </View>
-
-        {/* API Key Section */}
-        <View style={[styles.card, { borderBottomColor: themeColors.cardBorder }]}>
-          <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
-          <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{apiKeyStorageDescription}</Text>
-
-          <Text style={[styles.inputLabel, { color: themeColors.text }]}>Jules API Key</Text>
-          <View style={[styles.inputRow, { backgroundColor: themeColors.composerBg, borderColor: themeColors.composerBorder }]}>
-            <TextInput
-              accessibilityLabel="Jules API Key"
-              style={[styles.input, { color: themeColors.text }]}
-              value={draftApiKey}
-              onChangeText={setDraftApiKey}
-              placeholder={t('pasteApiKey')}
-              placeholderTextColor={themeColors.textMuted}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={t('clearApiKey')}
-              disabled={!draftApiKey}
-              style={[styles.clearButton, !draftApiKey && styles.clearButtonDisabled]}
-              onPress={handleClearApiKey}
-            >
-              <Text style={[styles.clearButtonText, { color: themeColors.textSecondary }]}>×</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity style={[styles.saveButton, { backgroundColor: themeColors.brand }]} onPress={handleSaveApiKey}>
-            <Text style={styles.saveButtonText}>{savedStatus || t('saveAndConnect')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Theme Preference Section */}
-        <View style={[styles.card, { borderBottomColor: themeColors.cardBorder }]}>
-          <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('theme')}</Text>
-          <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('themeDescription')}</Text>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={t('theme')}
-            accessibilityState={{ expanded: showThemeMenu }}
-            style={[
-              styles.selectBox,
-              { backgroundColor: themeColors.composerBg, borderColor: showThemeMenu ? themeColors.brand : themeColors.composerBorder },
-            ]}
-            onPress={() => {
-              setShowThemeMenu(current => !current);
-              setShowLanguageMenu(false);
-            }}
-          >
-            <Text style={[styles.selectBoxText, { color: themeColors.text }]}>{getThemeName(themePreference, t)}</Text>
-            <Text style={[styles.selectBoxArrow, { color: themeColors.brand }]}>{showThemeMenu ? '⌃' : '⌄'}</Text>
-          </TouchableOpacity>
-
-          {showThemeMenu ? (
-            <View style={[styles.menuList, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
-              {themeOptions.map(option => (
-                <TouchableOpacity
-                  key={option}
-                  accessibilityRole="menuitem"
-                  accessibilityState={{ selected: themePreference === option }}
-                  style={[
-                    styles.menuItem,
-                    { borderBottomColor: themeColors.cardBorder },
-                    themePreference === option && { backgroundColor: themeColors.brandSubtle },
-                  ]}
-                  onPress={() => {
-                    setShowThemeMenu(false);
-                    void setThemePreference(option);
-                  }}
-                >
-                  <Text style={[styles.menuItemText, { color: themePreference === option ? themeColors.brand : themeColors.text }]}>
-                    {getThemeName(option, t)}
-                  </Text>
-                  {themePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.brand }]}>✓</Text> : null}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        {/* Language Preference Section */}
-        <View style={[styles.card, { borderBottomColor: themeColors.cardBorder }]}>
-          <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('language')}</Text>
-          <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('languageDescription')}</Text>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={t('language')}
-            accessibilityState={{ expanded: showLanguageMenu }}
-            style={[
-              styles.selectBox,
-              { backgroundColor: themeColors.composerBg, borderColor: showLanguageMenu ? themeColors.brand : themeColors.composerBorder },
-            ]}
-            onPress={() => {
-              setShowLanguageMenu(current => !current);
-              setShowThemeMenu(false);
-            }}
-          >
-            <Text style={[styles.selectBoxText, { color: themeColors.text }]}>{getLanguageName(languagePreference)}</Text>
-            <Text style={[styles.selectBoxArrow, { color: themeColors.brand }]}>{showLanguageMenu ? '⌃' : '⌄'}</Text>
-          </TouchableOpacity>
-
-          {showLanguageMenu ? (
-            <View style={[styles.menuList, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
-              {languageOptions.map(option => (
-                <TouchableOpacity
-                  key={option}
-                  accessibilityRole="menuitem"
-                  accessibilityState={{ selected: languagePreference === option }}
-                  style={[
-                    styles.menuItem,
-                    { borderBottomColor: themeColors.cardBorder },
-                    languagePreference === option && { backgroundColor: themeColors.brandSubtle },
-                  ]}
-                  onPress={() => {
-                    setShowLanguageMenu(false);
-                    void setLanguagePreference(option);
-                  }}
-                >
-                  <Text style={[styles.menuItemText, { color: languagePreference === option ? themeColors.brand : themeColors.text }]}>
-                    {getLanguageName(option)}
-                  </Text>
-                  {languagePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.brand }]}>✓</Text> : null}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        {/* About JulesMe Section */}
-        <View style={[styles.card, styles.lastCard]}>
-          <View style={styles.aboutHeaderRow}>
-            <Image source={require('@/assets/images/jules-logo.png')} style={styles.aboutLogo} />
-            <View style={styles.aboutHeaderCopy}>
-              <Text style={[styles.cardTitle, { color: themeColors.text }]}>{t('aboutJulesMe')}</Text>
-              <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>{t('aboutSubtitle', brand)}</Text>
-            </View>
-          </View>
-
-          <View style={[styles.infoList, { borderTopColor: themeColors.cardBorder }]}>
-            <View style={[styles.infoRow, { borderBottomColor: themeColors.cardBorder }]}>
-              <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{t('appVersion')}</Text>
-              <Text style={[styles.infoValue, { color: themeColors.text }]}>v{appVersion} ({t('build')} {buildNumber})</Text>
-            </View>
-            <View style={[styles.infoRow, { borderBottomColor: themeColors.cardBorder }]}>
-              <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{t('brand')}</Text>
-              <Text style={[styles.infoValue, { color: themeColors.text }]}>{brand}</Text>
-            </View>
-            <View style={[styles.infoRow, { borderBottomColor: themeColors.cardBorder }]}>
-              <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{t('author')}</Text>
-              <Text style={[styles.infoValue, { color: themeColors.text }]}>{author}</Text>
-            </View>
-            <View style={[styles.infoRow, { borderBottomColor: themeColors.cardBorder }]}>
-              <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{t('dataPrivacy')}</Text>
-              <Text style={[styles.infoValue, { color: themeColors.text }]}>{apiKeyStorageDescription}</Text>
-            </View>
-          </View>
-
-          <View style={styles.releaseNotes}>
-            <Text style={[styles.releaseNotesTitle, { color: themeColors.text }]}>{t('releaseNotesTitle')}</Text>
-            <Text style={[styles.releaseNotesText, { color: themeColors.textSecondary }]}>{t('releaseNotesText')}</Text>
-          </View>
         </View>
       </ScrollView>
 
@@ -355,7 +544,6 @@ const styles = StyleSheet.create({
     minHeight: 64,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -363,7 +551,7 @@ const styles = StyleSheet.create({
   backButton: {
     width: 36,
     height: 36,
-    borderRadius: 0,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -379,9 +567,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   topBarLogo: {
-    width: 28,
-    height: 28,
-    borderRadius: 0,
+    width: 34,
+    height: 34,
+    borderRadius: 8,
   },
   topBarTitle: {
     fontSize: 18,
@@ -399,22 +587,16 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    borderRadius: 0,
-    borderWidth: 0,
-    borderBottomWidth: 1,
-    paddingVertical: 20,
+    paddingVertical: 18,
     paddingHorizontal: 0,
   },
-  lastCard: {
-    borderBottomWidth: 0,
-  },
+  lastCard: {},
   proCard: {
     gap: 10,
     padding: 16,
-    borderRadius: 0,
-    borderWidth: 0,
-    borderLeftWidth: 3,
-    marginBottom: 8,
+    borderRadius: 8,
+    marginTop: 18,
+    marginBottom: 16,
   },
   proHeader: {
     flexDirection: 'row',
@@ -432,7 +614,7 @@ const styles = StyleSheet.create({
   proBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 0,
+    borderRadius: 6,
   },
   proBadgeText: {
     color: '#FFFFFF',
@@ -445,15 +627,14 @@ const styles = StyleSheet.create({
   },
   proPrimaryButton: {
     minHeight: 44,
-    borderRadius: 0,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
   },
   proSecondaryButton: {
     minHeight: 42,
-    borderRadius: 0,
-    borderWidth: 1,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
@@ -483,10 +664,10 @@ const styles = StyleSheet.create({
   },
   inputRow: {
     minHeight: 46,
-    borderRadius: 0,
-    borderWidth: 1,
+    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingRight: 6,
   },
   input: {
     flex: 1,
@@ -495,16 +676,12 @@ const styles = StyleSheet.create({
     paddingRight: 6,
     fontSize: 15,
   },
-  clearButton: {
+  inputIconButton: {
     width: 36,
     height: 36,
-    marginRight: 6,
-    borderRadius: 0,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  clearButtonDisabled: {
-    opacity: 0.35,
   },
   clearButtonText: {
     fontSize: 22,
@@ -513,20 +690,39 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     minHeight: 44,
-    borderRadius: 0,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 14,
+  },
+  saveButtonDisabled: {
+    opacity: 0.75,
+  },
+  savingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
   },
+  statusBanner: {
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  statusBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
   selectBox: {
     minHeight: 46,
-    borderRadius: 0,
-    borderWidth: 1,
+    borderRadius: 8,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
@@ -537,14 +733,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  selectBoxArrow: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
   menuList: {
     marginTop: 4,
-    borderRadius: 0,
-    borderWidth: 1,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   menuItem: {
@@ -553,7 +744,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
   },
   menuItemText: {
     fontSize: 14,
@@ -571,18 +761,16 @@ const styles = StyleSheet.create({
   aboutLogo: {
     width: 40,
     height: 40,
-    borderRadius: 0,
+    borderRadius: 8,
   },
   aboutHeaderCopy: {
     flex: 1,
   },
   infoList: {
     marginTop: 18,
-    borderTopWidth: 1,
   },
   infoRow: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingVertical: 10,
     gap: 4,
   },
   infoLabel: {
@@ -604,5 +792,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 4,
+  },
+  instructionsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  proLockBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  proLockBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  instructionsInput: {
+    minHeight: 88,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 12,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  instructionsActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  instructionsFeedback: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  saveInstructionsBtn: {
+    minWidth: 100,
+  },
+  unlockProBanner: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  unlockProBannerText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

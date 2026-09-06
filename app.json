@@ -2,7 +2,7 @@
   "expo": {
     "name": "JulesMe",
     "slug": "julesMe",
-    "version": "1.1.13",
+    "version": "1.1.14",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -19,16 +19,16 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon-ios.png",
-      "buildNumber": "23"
+      "buildNumber": "24"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/icon.png"
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.sanomni.julesme",
-      "versionCode": 23
+      "versionCode": 24
     },
     "web": {
       "output": "static",

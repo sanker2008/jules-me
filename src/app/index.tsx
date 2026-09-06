@@ -28,6 +28,15 @@ import type { Translator } from '../i18n';
 import { useTheme } from '../hooks/use-theme';
 import { cleanPromptDisplay, getSingleRouteParam } from '../utils/jules-guards';
 import { getApiKey } from '../utils/secure-store';
+import { BreathingLogo } from '../components/breathing-logo';
+import { Chevron } from '../components/chevron';
+import { GradientButton } from '../components/gradient-button';
+import { usePro } from '../hooks/use-pro';
+import { ProBadge } from '../components/pro-badge';
+import { ProPaywallModal } from '../components/pro-paywall-modal';
+import { CustomPromptsModal } from '../components/custom-prompts-modal';
+import { CustomPrompt, getCustomPrompts, getGlobalInstructions } from '../utils/pro-storage';
+import { IS_PRO_ACTIVATION_AVAILABLE, PRO_PURCHASE_URL } from '../utils/license';
 
 type PickerMode = 'source' | 'branch' | null;
 
@@ -141,6 +150,12 @@ export default function TaskHomeScreen() {
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
+  const { proState, activate } = usePro();
+  const [customPrompts, setCustomPrompts] = useState<CustomPrompt[]>([]);
+  const [globalInstructions, setGlobalInstructions] = useState<string>('');
+  const [showCustomPromptsModal, setShowCustomPromptsModal] = useState(false);
+  const [showProPaywall, setShowProPaywall] = useState(false);
+
   const selectedSource = useMemo(
     () => sources.find(source => source.name === selectedSourceName),
     [selectedSourceName, sources],
@@ -227,6 +242,8 @@ export default function TaskHomeScreen() {
         setSavedApiKey(key);
         void fetchWorkspace(key);
       });
+      void getCustomPrompts().then(setCustomPrompts);
+      void getGlobalInstructions().then(setGlobalInstructions);
       return () => {
         disposed = true;
       };
@@ -309,15 +326,23 @@ export default function TaskHomeScreen() {
     }
     if (!prompt) return;
 
+    const finalPrompt = (proState.isPro && globalInstructions.trim())
+      ? `${prompt}\n\n[Jules 专属规范与编码偏好]:\n${globalInstructions.trim()}`
+      : prompt;
+
     setIsStartingSession(true);
     setWorkspaceError(null);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (proState.isPro) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
     try {
       const session = await createSession(
         savedApiKey,
         selectedSource.name,
         selectedBranch,
-        prompt,
+        finalPrompt,
         {
           requirePlanApproval,
           ...(autoCreatePr ? { automationMode: 'AUTO_CREATE_PR' } : {}),
@@ -360,7 +385,7 @@ export default function TaskHomeScreen() {
         key={session.name}
         accessibilityRole="button"
         accessibilityLabel={t('openSession', title)}
-        style={[styles.sessionCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}
+        style={[styles.sessionCard, { backgroundColor: themeColors.backgroundElement }]}
         onPress={() => resumeSession(session)}
       >
         <View style={styles.sessionCardHeader}>
@@ -397,9 +422,12 @@ export default function TaskHomeScreen() {
           <View style={styles.brandRow}>
             <Image source={require('@/assets/images/jules-logo.png')} style={styles.brandLogo} />
             <View>
-              <Text style={[styles.brand, { color: themeColors.brand }]}>JulesMe</Text>
+              <View style={styles.brandTitleRow}>
+                <Text style={[styles.brand, { color: themeColors.brand }]}>JulesMe</Text>
+                {proState.isPro ? <ProBadge tier={proState.tier} style={styles.topBarProBadge} /> : null}
+              </View>
               <Text style={[styles.topBarSubtext, { color: themeColors.textSecondary }]}>
-                {lastSyncedAt ? t('syncedAt', lastSyncedAt.toLocaleTimeString()) : t('workbench')}
+                {lastSyncedAt ? t('syncedAt', lastSyncedAt.toLocaleTimeString()) : (proState.isPro ? t('proWorkbenchSlogan') : t('workbench'))}
               </Text>
             </View>
           </View>
@@ -435,12 +463,20 @@ export default function TaskHomeScreen() {
           </View>
         ) : !savedApiKey ? (
           <View style={styles.initialLoading}>
-            <Image source={require('@/assets/images/jules-logo.png')} style={styles.landingLogo} />
+            <BreathingLogo
+              size={72}
+              borderRadius={16}
+              glowColor={themeColors.brandSubtle}
+              isPro={proState.isPro}
+              style={{ marginBottom: 16 }}
+            />
             <Text style={[styles.initialLoadingTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
             <Text style={[styles.initialLoadingText, { color: themeColors.textSecondary }]}>{t('apiKeyStartHint')}</Text>
-            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: themeColors.brand }]} onPress={() => router.push('/settings' as any)}>
-              <Text style={styles.primaryButtonText}>{t('configureApiKey')}</Text>
-            </TouchableOpacity>
+            <GradientButton
+              title={t('configureApiKey')}
+              onPress={() => router.push('/settings' as any)}
+              style={styles.primaryButton}
+            />
           </View>
         ) : (
           <ScrollView
@@ -450,7 +486,7 @@ export default function TaskHomeScreen() {
             keyboardShouldPersistTaps="handled"
             refreshControl={<RefreshControl refreshing={isLoadingWorkspace} onRefresh={refreshWorkspace} tintColor={themeColors.brand} />}
           >
-            <View style={[styles.hero, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+            <View style={[styles.hero, { backgroundColor: themeColors.backgroundElement }]}>
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={t('newTask')}
@@ -468,7 +504,7 @@ export default function TaskHomeScreen() {
                   </Text>
                 </View>
                 <View style={[styles.heroToggleCircle, { backgroundColor: themeColors.brandSubtle }]}>
-                  <Text style={[styles.heroToggleArrow, { color: themeColors.brand }]}>{isFormExpanded ? '⌃' : '⌄'}</Text>
+                  <Chevron direction={isFormExpanded ? 'up' : 'down'} color={themeColors.brand} size={6} />
                 </View>
               </TouchableOpacity>
 
@@ -480,12 +516,12 @@ export default function TaskHomeScreen() {
                     <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityLabel={t('chooseRepository')}
-                      style={[styles.contextChip, { backgroundColor: themeColors.chipBg, borderColor: themeColors.chipBorder }]}
+                      style={[styles.contextChip, { backgroundColor: themeColors.chipBg }]}
                       onPress={() => setPickerMode('source')}
                     >
                       <Text style={[styles.contextChipLabel, { color: themeColors.brand }]}>⌘ {getSourceLabel(selectedSource, t)}</Text>
                       <View style={styles.contextChipArrowContainer}>
-                        <Text style={[styles.contextChipArrow, { color: themeColors.brand }]}>⌄</Text>
+                        <Chevron direction="down" color={themeColors.brand} size={5} strokeWidth={1.6} />
                       </View>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -493,7 +529,7 @@ export default function TaskHomeScreen() {
                       accessibilityLabel={t('chooseStartingBranch')}
                       style={[
                         styles.contextChip,
-                        { backgroundColor: themeColors.chipBg, borderColor: themeColors.chipBorder },
+                        { backgroundColor: themeColors.chipBg },
                         !selectedSource && styles.contextChipDisabled,
                       ]}
                       disabled={!selectedSource}
@@ -501,12 +537,12 @@ export default function TaskHomeScreen() {
                     >
                       <Text style={[styles.contextChipLabel, { color: themeColors.brand }]}>⑂ {selectedBranch || t('chooseBranch')}</Text>
                       <View style={styles.contextChipArrowContainer}>
-                        <Text style={[styles.contextChipArrow, { color: themeColors.brand }]}>⌄</Text>
+                        <Chevron direction="down" color={themeColors.brand} size={5} strokeWidth={1.6} />
                       </View>
                     </TouchableOpacity>
                   </View>
 
-                  <View style={[styles.composer, { backgroundColor: themeColors.composerBg, borderColor: themeColors.composerBorder }]}>
+                  <View style={[styles.composer, { backgroundColor: themeColors.composerBg }]}>
                     <TextInput
                       accessibilityLabel={t('taskDescription')}
                       style={[styles.taskInput, { color: themeColors.text }]}
@@ -524,25 +560,22 @@ export default function TaskHomeScreen() {
                           accessibilityRole="button"
                           accessibilityLabel={t('clearForm')}
                           onPress={handleClearForm}
-                          style={[styles.clearFormButton, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
+                          style={[styles.clearFormButton, { backgroundColor: themeColors.brandSubtle }]}
                         >
                           <Text style={[styles.clearFormButtonText, { color: themeColors.brand }]}>{t('clearForm')}</Text>
                         </TouchableOpacity>
                       ) : null}
-                      <TouchableOpacity
-                        accessibilityRole="button"
+                      <GradientButton
                         accessibilityLabel={t('startTask')}
                         disabled={!canStartTask}
+                        loading={isStartingSession}
+                        title={t('startTaskButton')}
                         onPress={handleStartTask}
                         style={[
                           styles.startButton,
-                          { backgroundColor: themeColors.brand },
-                          !canStartTask && styles.startButtonDisabled,
                           isFormDirty && styles.startButtonFlexible,
                         ]}
-                      >
-                        {isStartingSession ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.startButtonText}>{t('startTaskButton')}</Text>}
-                      </TouchableOpacity>
+                      />
                     </View>
                   </View>
 
@@ -550,15 +583,40 @@ export default function TaskHomeScreen() {
                     {taskTemplates.map(template => (
                       <TouchableOpacity
                         key={template}
-                        style={[styles.templateChip, { backgroundColor: themeColors.chipBg, borderColor: themeColors.chipBorder }]}
+                        style={[styles.templateChip, { backgroundColor: themeColors.chipBg }]}
                         onPress={() => setTaskPrompt(template)}
                       >
                         <Text style={[styles.templateText, { color: themeColors.textSecondary }]}>{template}</Text>
                       </TouchableOpacity>
                     ))}
+                    {customPrompts.map(cp => (
+                      <TouchableOpacity
+                        key={cp.id}
+                        style={[styles.templateChip, { backgroundColor: themeColors.chipBg }]}
+                        onPress={() => setTaskPrompt(cp.prompt)}
+                      >
+                        <Text style={[styles.templateText, { color: themeColors.brand, fontWeight: '700' }]}>✦ {cp.title}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={t('addCustomPrompt')}
+                      style={[styles.templateChip, { backgroundColor: themeColors.brandSubtle }]}
+                      onPress={() => {
+                        if (proState.isPro) {
+                          setShowCustomPromptsModal(true);
+                        } else {
+                          setShowProPaywall(true);
+                        }
+                      }}
+                    >
+                      <Text style={[styles.templateText, { color: themeColors.brand, fontWeight: '800' }]}>
+                        {t('addCustomPrompt')} {!proState.isPro ? '✦' : ''}
+                      </Text>
+                    </TouchableOpacity>
                   </ScrollView>
 
-                  <View style={[styles.optionRow, { borderTopColor: themeColors.cardBorder }]}>
+                  <View style={styles.optionRow}>
                     <View style={styles.optionCopy}>
                       <Text style={[styles.optionTitle, { color: themeColors.text }]}>{t('requirePlanTitle')}</Text>
                       <Text style={[styles.optionDescription, { color: themeColors.textSecondary }]}>{t('requirePlanDescription')}</Text>
@@ -570,7 +628,7 @@ export default function TaskHomeScreen() {
                       thumbColor={requirePlanApproval ? themeColors.brand : '#FFFFFF'}
                     />
                   </View>
-                  <View style={[styles.optionRow, { borderTopColor: themeColors.cardBorder }]}>
+                  <View style={styles.optionRow}>
                     <View style={styles.optionCopy}>
                       <Text style={[styles.optionTitle, { color: themeColors.text }]}>{t('autoPrTitle')}</Text>
                       <Text style={[styles.optionDescription, { color: themeColors.textSecondary }]}>{t('autoPrDescription')}</Text>
@@ -597,7 +655,7 @@ export default function TaskHomeScreen() {
             ) : null}
 
             {recentSessions.length > 0 ? (
-              <View style={[styles.searchBarContainer, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+              <View style={[styles.searchBarContainer, { backgroundColor: themeColors.backgroundElement }]}>
                 <Text style={styles.searchIcon}>🔍</Text>
                 <TextInput
                   accessibilityLabel={t('searchSessions')}
@@ -665,8 +723,8 @@ export default function TaskHomeScreen() {
         <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.sheetOverlay}>
           <TouchableOpacity style={styles.sheetDismiss} activeOpacity={1} onPress={() => setPickerMode(null)} />
           <View style={[styles.sheet, { backgroundColor: themeColors.sheetBg }]}>
-            <View style={[styles.sheetHandle, { backgroundColor: themeColors.cardBorder }]} />
-            <View style={[styles.sheetHeader, { borderBottomColor: themeColors.cardBorder }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: themeColors.backgroundSelected }]} />
+            <View style={styles.sheetHeader}>
               <View>
                 <Text style={[styles.sheetTitle, { color: themeColors.text }]}>{pickerMode === 'source' ? t('chooseRepository') : t('chooseStartingBranch')}</Text>
                 <Text style={[styles.sheetDescription, { color: themeColors.textSecondary }]}>
@@ -681,7 +739,7 @@ export default function TaskHomeScreen() {
               {pickerMode === 'source' ? sources.map(source => (
                 <TouchableOpacity
                   key={source.name}
-                  style={[styles.sheetItem, { backgroundColor: themeColors.sheetItemBg, borderColor: themeColors.cardBorder }]}
+                  style={[styles.sheetItem, { backgroundColor: themeColors.sheetItemBg }]}
                   onPress={() => selectSource(source)}
                 >
                   <View style={styles.sheetItemCopy}>
@@ -695,7 +753,7 @@ export default function TaskHomeScreen() {
               )) : availableBranches.map(branch => (
                 <TouchableOpacity
                   key={branch}
-                  style={[styles.sheetItem, { backgroundColor: themeColors.sheetItemBg, borderColor: themeColors.cardBorder }]}
+                  style={[styles.sheetItem, { backgroundColor: themeColors.sheetItemBg }]}
                   onPress={() => {
                     setSelectedBranch(branch);
                     setPickerMode(null);
@@ -717,6 +775,24 @@ export default function TaskHomeScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      <CustomPromptsModal
+        visible={showCustomPromptsModal}
+        onClose={() => setShowCustomPromptsModal(false)}
+        prompts={customPrompts}
+        onPromptsChange={setCustomPrompts}
+        onSelectPrompt={prompt => setTaskPrompt(prompt)}
+        t={t}
+      />
+
+      <ProPaywallModal
+        visible={showProPaywall}
+        onDismiss={() => setShowProPaywall(false)}
+        onActivate={activate}
+        activationAvailable={IS_PRO_ACTIVATION_AVAILABLE}
+        purchaseUrl={PRO_PURCHASE_URL}
+        t={t}
+      />
     </SafeAreaView>
   );
 }
@@ -728,7 +804,6 @@ const styles = StyleSheet.create({
     minHeight: 70,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -738,15 +813,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  brandTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  topBarProBadge: {
+    marginLeft: 2,
+  },
   brandLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 0,
+    width: 42,
+    height: 42,
+    borderRadius: 9,
   },
   landingLogo: {
     width: 64,
     height: 64,
-    borderRadius: 0,
+    borderRadius: 12,
     marginBottom: 8,
   },
   brand: {
@@ -763,7 +846,7 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 36,
     height: 36,
-    borderRadius: 0,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -783,17 +866,13 @@ const styles = StyleSheet.create({
   initialLoadingTitle: { fontSize: 22, fontWeight: '800' },
   initialLoadingText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   hero: {
-    borderRadius: 0,
+    borderRadius: 8,
     padding: 16,
-    borderBottomWidth: 1,
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
   },
   heroHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   heroHeaderCopy: { flex: 1 },
   heroHeaderTitle: { fontSize: 20, lineHeight: 26, fontWeight: '800', marginTop: 3, letterSpacing: -0.3 },
-  heroToggleCircle: { width: 28, height: 28, borderRadius: 0, alignItems: 'center', justifyContent: 'center' },
+  heroToggleCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   heroToggleArrow: { fontSize: 18, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
   heroBody: { marginTop: 10 },
   eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
@@ -806,20 +885,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    borderRadius: 0,
+    borderRadius: 8,
     paddingHorizontal: 12,
   },
   contextChipDisabled: { opacity: 0.45 },
   contextChipLabel: { maxWidth: 220, fontSize: 13, fontWeight: '700' },
   contextChipArrowContainer: { width: 16, height: 20, alignItems: 'center', justifyContent: 'center' },
   contextChipArrow: { fontSize: 16, lineHeight: 16, textAlign: 'center', includeFontPadding: false },
-  composer: { marginTop: 14, borderWidth: 1, borderRadius: 0, padding: 12 },
+  composer: { marginTop: 14, borderRadius: 8, padding: 12 },
   taskInput: { minHeight: 116, fontSize: 16, lineHeight: 23, paddingHorizontal: 4, paddingTop: 4, paddingBottom: 12 },
   composerFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   clearFormButton: {
     minHeight: 44,
-    borderRadius: 0,
-    borderWidth: 1,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
@@ -827,7 +905,7 @@ const styles = StyleSheet.create({
   clearFormButtonText: { fontSize: 13, fontWeight: '700' },
   startButton: {
     minHeight: 44,
-    borderRadius: 0,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
@@ -836,7 +914,7 @@ const styles = StyleSheet.create({
   startButtonDisabled: { opacity: 0.4 },
   startButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   templateRow: { gap: 8, paddingTop: 12, paddingBottom: 2 },
-  templateChip: { borderRadius: 0, paddingHorizontal: 10, paddingVertical: 6 },
+  templateChip: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
   templateText: { fontSize: 12, fontWeight: '600' },
   optionRow: {
     minHeight: 56,
@@ -846,12 +924,11 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingTop: 12,
     marginTop: 2,
-    borderTopWidth: 1,
   },
   optionCopy: { flex: 1 },
   optionTitle: { fontSize: 14, fontWeight: '800' },
   optionDescription: { fontSize: 12, lineHeight: 17, marginTop: 2 },
-  errorCard: { backgroundColor: '#FFF5F5', borderLeftWidth: 3, borderLeftColor: '#B42318', borderRadius: 0, padding: 14 },
+  errorCard: { backgroundColor: '#FFF5F5', borderRadius: 8, padding: 14 },
   errorTitle: { color: '#B42318', fontSize: 14, fontWeight: '800' },
   errorText: { color: '#8D3028', fontSize: 13, lineHeight: 19, marginTop: 4 },
   errorRetry: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 4 },
@@ -860,33 +937,30 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2, marginBottom: 4 },
   sectionDescription: { fontSize: 13, lineHeight: 19, marginBottom: 8 },
   sessionCard: {
-    borderRadius: 0,
+    borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
+    marginVertical: 3,
   },
   sessionCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   sessionTitle: { flex: 1, fontSize: 15, fontWeight: '700' },
   sessionMeta: { fontSize: 12, marginTop: 6 },
-  statusPill: { borderRadius: 0, paddingHorizontal: 6, paddingVertical: 3 },
+  statusPill: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   statusText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase' },
   emptyText: { fontSize: 13, lineHeight: 20, paddingVertical: 12 },
-  searchBarContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 0, borderWidth: 1, paddingHorizontal: 12, minHeight: 42, marginVertical: 4 },
+  searchBarContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 14, minHeight: 44, marginVertical: 4 },
   searchIcon: { fontSize: 14, marginRight: 8 },
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 8 },
   searchClearButton: { padding: 6 },
   searchClearText: { fontSize: 13, fontWeight: '700' },
   emptySearchContainer: { paddingVertical: 24, alignItems: 'center', justifyContent: 'center' },
   emptySearchText: { fontSize: 14, fontWeight: '600' },
-  loadMoreButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 0, marginTop: 8 },
+  loadMoreButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 8, marginTop: 8 },
   loadMoreText: { fontSize: 13, fontWeight: '800' },
   sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
   sheetDismiss: { flex: 1 },
-  sheet: { maxHeight: '78%', borderRadius: 0, paddingTop: 10 },
-  sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 0 },
+  sheet: { maxHeight: '78%', borderRadius: 16, paddingTop: 10 },
+  sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2 },
   sheetHeader: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -894,30 +968,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    borderBottomWidth: 1,
   },
   sheetTitle: { fontSize: 18, fontWeight: '800' },
   sheetDescription: { fontSize: 12, maxWidth: 280, lineHeight: 18, marginTop: 4 },
-  closeButton: { width: 32, height: 32, borderRadius: 0, alignItems: 'center', justifyContent: 'center' },
+  closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   closeButtonText: { fontSize: 22, lineHeight: 24 },
   sheetList: { flexGrow: 0 },
   sheetListContent: { padding: 12, paddingBottom: 30, gap: 4 },
   sheetItem: {
     minHeight: 56,
-    borderRadius: 0,
-    borderWidth: 0,
-    borderBottomWidth: 1,
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+    marginVertical: 2,
   },
   sheetItemCopy: { flex: 1 },
   sheetItemTitle: { flex: 1, fontSize: 14, fontWeight: '700' },
   sheetItemSubtitle: { fontSize: 12, marginTop: 3 },
   selectedMark: { fontSize: 18, fontWeight: '800' },
-  primaryButton: { borderRadius: 0, paddingHorizontal: 18, paddingVertical: 12, marginTop: 8 },
+  primaryButton: { borderRadius: 8, paddingHorizontal: 18, paddingVertical: 12, marginTop: 8 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
 });
