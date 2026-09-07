@@ -19,6 +19,8 @@ export type ImageAttachmentResult =
 
 export const MAX_IMAGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
+export type DeliveryTitleKey = 'prCreatedDelivery' | 'completedWithoutPrDelivery' | 'failedDelivery';
+
 const supportedImageMimeTypes = new Set<ImageAttachment['mimeType']>([
   'image/gif',
   'image/jpeg',
@@ -27,6 +29,11 @@ const supportedImageMimeTypes = new Set<ImageAttachment['mimeType']>([
 ]);
 
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/;
+
+export function getDeliveryTitleKey(state: string | undefined, hasPullRequest: boolean): DeliveryTitleKey {
+  if (state !== 'COMPLETED') return 'failedDelivery';
+  return hasPullRequest ? 'prCreatedDelivery' : 'completedWithoutPrDelivery';
+}
 
 function inferImageMimeType(uri: string): ImageAttachment['mimeType'] | undefined {
   const extension = uri.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();

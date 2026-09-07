@@ -6,11 +6,18 @@ import {
   createImageAttachment,
   encodeJulesResourceId,
   encodeJulesResourcePath,
+  getDeliveryTitleKey,
   getSingleRouteParam,
   isTrustedPullRequestUrl,
   MAX_IMAGE_ATTACHMENT_BYTES,
   parseMessageContent,
 } from '../src/utils/jules-guards';
+
+test('maps completed delivery copy to the artifacts Jules actually returned', () => {
+  assert.equal(getDeliveryTitleKey('COMPLETED', true), 'prCreatedDelivery');
+  assert.equal(getDeliveryTitleKey('COMPLETED', false), 'completedWithoutPrDelivery');
+  assert.equal(getDeliveryTitleKey('FAILED', false), 'failedDelivery');
+});
 
 test('normalizes only a single non-empty route parameter', () => {
   assert.equal(getSingleRouteParam(' session-123 '), 'session-123');

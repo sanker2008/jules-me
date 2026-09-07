@@ -36,9 +36,11 @@ import {
 import { createTranslator, useAppLanguage } from '../i18n';
 import type { Translator } from '../i18n';
 import { useTheme } from '../hooks/use-theme';
+import { goBackOrHome } from '../utils/navigation';
 import {
   cleanPromptDisplay,
   createImageAttachment,
+  getDeliveryTitleKey,
   getSingleRouteParam,
   isTrustedPullRequestUrl,
   parseMessageContent,
@@ -915,7 +917,7 @@ export default function ChatScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('back')}
             style={[styles.backButton, { backgroundColor: themeColors.brandSubtle }]}
-            onPress={() => router.back()}
+            onPress={() => goBackOrHome(router)}
           >
             <Text style={[styles.backButtonText, { color: themeColors.brand }]}>‹</Text>
           </TouchableOpacity>
@@ -1003,7 +1005,7 @@ export default function ChatScreen() {
                   <Text style={[styles.deliveryEyebrow, activeState === 'FAILED' && styles.deliveryEyebrowFailed]}>
                     {activeState === 'COMPLETED' ? t('taskCompleted') : t('taskIncomplete')}
                   </Text>
-                  <Text style={styles.deliveryTitle}>{activeState === 'COMPLETED' ? t('prCreatedDelivery') : t('failedDelivery')}</Text>
+                  <Text style={styles.deliveryTitle}>{t(getDeliveryTitleKey(activeState, Boolean(firstPullRequest)))}</Text>
                   <Text style={styles.deliveryText}>
                     {activeState === 'COMPLETED' ? t('completedDelivery') : t('sessionFailedText')}
                   </Text>
@@ -1034,7 +1036,7 @@ export default function ChatScreen() {
                       end={{ x: 1, y: 1 }}
                       style={styles.proReportBadge}
                     >
-                      <Text style={styles.proReportBadgeText}>✦ PRO VIP</Text>
+                      <Text style={styles.proReportBadgeText}>✦ PRO</Text>
                     </LinearGradient>
                     <Text style={[styles.proReportTitle, { color: themeColors.text }]}>
                       {t('proAchievementCardTitle')}
@@ -1047,23 +1049,23 @@ export default function ChatScreen() {
                         {deliveryMetrics.changeSets}
                       </Text>
                       <Text style={[styles.proReportStatLabel, { color: themeColors.textSecondary }]}>
-                        变更文件
+                        {t('proReportChangedFiles')}
                       </Text>
                     </View>
                     <View style={styles.proReportStat}>
                       <Text style={[styles.proReportStatNum, { color: '#10B981' }]}>
-                        {deliveryMetrics.successfulCommands}
+                        {deliveryMetrics.successfulCommands}/{deliveryMetrics.commands}
                       </Text>
                       <Text style={[styles.proReportStatLabel, { color: themeColors.textSecondary }]}>
-                        通过命令
+                        {t('proReportPassedCommands')}
                       </Text>
                     </View>
                     <View style={styles.proReportStat}>
                       <Text style={[styles.proReportStatNum, { color: '#F59E0B' }]}>
-                        ~{Math.max(0.5, Math.round((deliveryMetrics.changeSets * 0.4 + 0.5) * 10) / 10)}h
+                        {pullRequests.length}
                       </Text>
                       <Text style={[styles.proReportStatLabel, { color: themeColors.textSecondary }]}>
-                        节省工时
+                        {t('proReportPullRequests')}
                       </Text>
                     </View>
                   </View>
@@ -1073,7 +1075,7 @@ export default function ChatScreen() {
                       {t('proAchievementCoffeeTitle')}
                     </Text>
                     <Text style={[styles.proReportPerkDesc, { color: themeColors.textSecondary }]}>
-                      {t('proAchievementCoffeeDesc')}
+                      {t('proAchievementCoffeeDesc', Boolean(firstPullRequest))}
                     </Text>
                   </View>
                 </View>
@@ -1163,7 +1165,7 @@ export default function ChatScreen() {
                   style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle, borderColor: themeColors.chipBorder }]}
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setInputText('检查并修复这个报错：');
+                    setInputText(t('promptFixBugTemplate'));
                   }}
                 >
                   <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>🐛 {t('promptFixBugChip')}</Text>
@@ -1172,7 +1174,7 @@ export default function ChatScreen() {
                   style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle }]}
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setInputText('为刚才涉及的核心业务逻辑补充单元测试');
+                    setInputText(t('promptAddTestsTemplate'));
                   }}
                 >
                   <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>🧪 {t('promptAddTestsChip')}</Text>
@@ -1181,7 +1183,7 @@ export default function ChatScreen() {
                   style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle }]}
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setInputText('优化这部分代码的性能和可读性，进行精简重构');
+                    setInputText(t('promptRefactorTemplate'));
                   }}
                 >
                   <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>⚡ {t('promptRefactorChip')}</Text>
@@ -1190,7 +1192,7 @@ export default function ChatScreen() {
                   style={[styles.quickPromptChip, { backgroundColor: themeColors.brandSubtle }]}
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setInputText('请详细解释这段代码的核心逻辑和执行流程');
+                    setInputText(t('promptExplainCodeTemplate'));
                   }}
                 >
                   <Text style={[styles.quickPromptText, { color: themeColors.brand }]}>💡 {t('promptExplainCodeChip')}</Text>

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { ImageBackground } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   createSession,
@@ -37,8 +38,14 @@ import { ProPaywallModal } from '../components/pro-paywall-modal';
 import { CustomPromptsModal } from '../components/custom-prompts-modal';
 import { CustomPrompt, getCustomPrompts, getGlobalInstructions } from '../utils/pro-storage';
 import { IS_PRO_ACTIVATION_AVAILABLE, PRO_PURCHASE_URL } from '../utils/license';
+import { useAppTheme } from '../theme';
 
 type PickerMode = 'source' | 'branch' | null;
+
+const HOME_BACKGROUNDS = {
+  light: require('@/assets/images/octopus-theme/home-background-light.png'),
+  dark: require('@/assets/images/octopus-theme/home-background-dark.png'),
+} as const;
 
 function getRelativeTime(dateString: string | undefined, t: Translator): string {
   if (!dateString) return t('justUpdated');
@@ -103,6 +110,7 @@ function isActive(session: Session) {
 export default function TaskHomeScreen() {
   const router = useRouter();
   const themeColors = useTheme();
+  const { theme } = useAppTheme();
   const { language } = useAppLanguage();
   const t = useMemo(() => createTranslator(language), [language]);
   const taskTemplates = useMemo(() => [
@@ -327,7 +335,7 @@ export default function TaskHomeScreen() {
     if (!prompt) return;
 
     const finalPrompt = (proState.isPro && globalInstructions.trim())
-      ? `${prompt}\n\n[Jules 专属规范与编码偏好]:\n${globalInstructions.trim()}`
+      ? `${prompt}\n\n[${t('globalInstructionsPromptLabel')}]:\n${globalInstructions.trim()}`
       : prompt;
 
     setIsStartingSession(true);
@@ -417,7 +425,13 @@ export default function TaskHomeScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: themeColors.background }]}>
-      <View style={[styles.screen, { backgroundColor: themeColors.background }]}>
+      <ImageBackground
+        source={HOME_BACKGROUNDS[theme]}
+        style={[styles.screen, { backgroundColor: themeColors.background }]}
+        imageStyle={theme === 'dark' ? styles.homeBackgroundDark : styles.homeBackgroundLight}
+        contentFit="cover"
+        contentPosition="center"
+      >
         <View style={[styles.topBar, { backgroundColor: themeColors.topBar, borderBottomColor: themeColors.topBarBorder }]}>
           <View style={styles.brandRow}>
             <Image source={require('@/assets/images/jules-logo.png')} style={styles.brandLogo} />
@@ -543,6 +557,19 @@ export default function TaskHomeScreen() {
                   </View>
 
                   <View style={[styles.composer, { backgroundColor: themeColors.composerBg }]}>
+                    {proState.isPro && globalInstructions.trim() ? (
+                      <View
+                        accessibilityLiveRegion="polite"
+                        style={[styles.globalInstructionsStatus, { backgroundColor: themeColors.brandSubtle }]}
+                      >
+                        <Text style={[styles.globalInstructionsStatusTitle, { color: themeColors.brand }]}>
+                          ✦ {t('globalInstructionsActive')}
+                        </Text>
+                        <Text style={[styles.globalInstructionsStatusText, { color: themeColors.textSecondary }]}>
+                          {t('globalInstructionsActiveDescription')}
+                        </Text>
+                      </View>
+                    ) : null}
                     <TextInput
                       accessibilityLabel={t('taskDescription')}
                       style={[styles.taskInput, { color: themeColors.text }]}
@@ -717,7 +744,7 @@ export default function TaskHomeScreen() {
             </View>
           </ScrollView>
         )}
-      </View>
+      </ImageBackground>
 
       <Modal visible={pickerMode !== null} animationType="slide" transparent onRequestClose={() => setPickerMode(null)}>
         <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.sheetOverlay}>
@@ -800,6 +827,8 @@ export default function TaskHomeScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   screen: { flex: 1 },
+  homeBackgroundLight: { opacity: 0.82 },
+  homeBackgroundDark: { opacity: 0.7 },
   topBar: {
     minHeight: 70,
     paddingHorizontal: 20,
@@ -893,6 +922,9 @@ const styles = StyleSheet.create({
   contextChipArrowContainer: { width: 16, height: 20, alignItems: 'center', justifyContent: 'center' },
   contextChipArrow: { fontSize: 16, lineHeight: 16, textAlign: 'center', includeFontPadding: false },
   composer: { marginTop: 14, borderRadius: 8, padding: 12 },
+  globalInstructionsStatus: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8, gap: 2 },
+  globalInstructionsStatusTitle: { fontSize: 12, lineHeight: 17, fontWeight: '800' },
+  globalInstructionsStatusText: { fontSize: 11, lineHeight: 16 },
   taskInput: { minHeight: 116, fontSize: 16, lineHeight: 23, paddingHorizontal: 4, paddingTop: 4, paddingBottom: 12 },
   composerFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   clearFormButton: {

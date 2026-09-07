@@ -23,6 +23,7 @@ import { createTranslator, getLanguageName, getThemeName, languageOptions, useAp
 import { themeOptions, useAppTheme } from '../theme';
 import { useTheme } from '../hooks/use-theme';
 import { getApiKey, saveApiKey } from '../utils/secure-store';
+import { validateAndPersistApiKey } from '../utils/api-key-settings';
 import { getSources, JulesApiError } from '../services/api';
 import {
   IS_PRO_ACTIVATION_AVAILABLE,
@@ -30,6 +31,7 @@ import {
   PRO_PURCHASE_URL,
 } from '../utils/license';
 import { maskLicenseKey } from '../utils/license-state';
+import { goBackOrHome } from '../utils/navigation';
 
 function EyeIcon({ visible, color }: { visible: boolean; color: string }) {
   return (
@@ -139,14 +141,12 @@ export default function SettingsScreen() {
     setConnectionStatus(null);
 
     try {
-      await getSources(nextApiKey);
-      await saveApiKey(nextApiKey);
+      await validateAndPersistApiKey(nextApiKey, getSources, saveApiKey);
       setConnectionStatus({
         type: 'success',
         message: t('connectSuccess'),
       });
     } catch (error) {
-      await saveApiKey(nextApiKey);
       const detail = error instanceof JulesApiError
         ? error.message
         : error instanceof Error
@@ -154,7 +154,7 @@ export default function SettingsScreen() {
           : t('connectFailed');
       setConnectionStatus({
         type: 'error',
-        message: `${t('connectFailed')}: ${detail}`,
+        message: t('connectFailedNotSaved', detail),
       });
     } finally {
       setIsConnecting(false);
@@ -192,7 +192,7 @@ export default function SettingsScreen() {
           accessibilityRole="button"
           accessibilityLabel={t('back')}
           style={[styles.backButton, { backgroundColor: themeColors.brandSubtle }]}
-          onPress={() => router.back()}
+          onPress={() => goBackOrHome(router)}
         >
           <Text style={[styles.backButtonText, { color: themeColors.brand }]}>‹</Text>
         </TouchableOpacity>
@@ -435,7 +435,7 @@ export default function SettingsScreen() {
               style={[styles.unlockProBanner, { backgroundColor: themeColors.brandSubtle }]}
             >
               <Text style={[styles.unlockProBannerText, { color: themeColors.brand }]}>
-                {t('proLockedFeatureNotice')} · 点击升级解锁 →
+                {t('proLockedFeatureNotice')} · {t('proLockedFeatureAction')} →
               </Text>
             </TouchableOpacity>
           )}

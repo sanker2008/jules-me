@@ -4,6 +4,24 @@ All notable changes to JulesMe are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.15] - 2026-09-07
+
+### Added
+
+- Added theme-aware light and dark octopus artwork to the home screen while keeping task content readable on opaque surfaces.
+- Added regression coverage for API Key persistence, safe back navigation, and completed deliveries without a Pull Request.
+
+### Changed
+
+- Refined the Pro workflow copy, localized quick-prompt templates, active coding-rules feedback, custom Prompt management, and evidence-based delivery report across Simplified Chinese, Traditional Chinese, and English.
+- Advanced the Expo version to `1.1.15`, iOS build number to `25`, and Android version code to `25`.
+
+### Fixed
+
+- API Keys are now persisted only after Jules accepts the connection, so rejected input cannot overwrite a previously working key.
+- Directly opened Settings and Chat routes now return safely to Home when no navigation history exists.
+- Completed sessions no longer claim that a Pull Request was created when Jules returned no Pull Request.
+
 ## [1.1.14] - 2026-09-07
 
 ### Added

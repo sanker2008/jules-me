@@ -33,11 +33,11 @@ export function ProBadge({
   const label = isLifetime ? t('proLifetimeBadge') : t('proBadge');
 
   const privileges = [
-    { icon: '✨', title: '金色流光身份', desc: '独占香槟流金呼吸光环与 VIP 徽章' },
-    { icon: '⚡', title: '自定义指令库', desc: '无限添加常用 Prompt，一键快速开工' },
-    { icon: '🎯', title: '全局编码人设', desc: '统一代码规范与注释偏好，自动注入任务' },
-    { icon: '📊', title: 'Jules 打工战报', desc: '专属代码变更换算与摸鱼喝咖啡成就卡片' },
-    { icon: '📳', title: '高级触感反馈', desc: '清脆微振动反馈，每一次操作皆有质感' },
+    { icon: '⚡', title: t('proPrivilegePromptsTitle'), desc: t('proPrivilegePromptsDesc') },
+    { icon: '🎯', title: t('proPrivilegeRulesTitle'), desc: t('proPrivilegeRulesDesc') },
+    { icon: '↻', title: t('proPrivilegeAutoApplyTitle'), desc: t('proPrivilegeAutoApplyDesc') },
+    { icon: '📊', title: t('proPrivilegeReportTitle'), desc: t('proPrivilegeReportDesc') },
+    { icon: '✨', title: t('proPrivilegeIdentityTitle'), desc: t('proPrivilegeIdentityDesc') },
   ];
 
   return (

@@ -41,7 +41,7 @@ export function CustomPromptsModal({
     const title = newTitle.trim();
     const prompt = newContent.trim();
     if (!title || !prompt) {
-      setError('请输入标题和指令内容');
+      setError(t('customPromptFieldsRequired'));
       return;
     }
 
@@ -80,12 +80,12 @@ export function CustomPromptsModal({
       >
         <View style={[styles.card, { backgroundColor: themeColors.card }]}>
           <View style={styles.header}>
-            <View>
+            <View style={styles.headerCopy}>
               <Text style={[styles.title, { color: themeColors.text }]}>
                 {t('managePromptsTitle')}
               </Text>
               <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-                Pro 专属快捷指令库 · 点击即可填入任务
+                {t('customPromptsModalSubtitle')}
               </Text>
             </View>
             <TouchableOpacity
@@ -139,7 +139,7 @@ export function CustomPromptsModal({
             {/* List of Custom Prompts */}
             <View style={styles.listSection}>
               <Text style={[styles.sectionHeading, { color: themeColors.textSecondary }]}>
-                已保存的指令 ({prompts.length})
+                {t('savedCustomPrompts', prompts.length)}
               </Text>
               {prompts.length === 0 ? (
                 <Text style={[styles.emptyText, { color: themeColors.textMuted }]}>
@@ -206,6 +206,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
+  },
+  headerCopy: {
+    flex: 1,
+    paddingRight: 12,
   },
   title: {
     fontSize: 18,
