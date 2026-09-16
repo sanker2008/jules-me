@@ -150,6 +150,7 @@ export function ProPaywallModal({
             <View style={[styles.planCard, { backgroundColor: themeColors.backgroundElement }]}>
               <Text selectable style={[styles.planName, { color: themeColors.text }]}>{t('proMonthlyPlan')}</Text>
               <Text selectable style={[styles.planPrice, { color: themeColors.brand }]}>{t('proMonthlyPrice')}</Text>
+              <Text selectable style={[styles.planMeta, { color: themeColors.textSecondary }]}>{t('proPrivilegeImagesTitle')}</Text>
               <Text selectable style={[styles.planMeta, { color: themeColors.textSecondary }]}>{t('proMonthlyBenefitRelay')}</Text>
               <Text selectable style={[styles.planMeta, { color: themeColors.textSecondary }]}>{t('proMonthlyBenefitPrompts')}</Text>
             </View>
@@ -158,6 +159,7 @@ export function ProPaywallModal({
               <Text selectable style={[styles.recommendedLabel, { color: themeColors.brand }]}>{t('proRecommended')}</Text>
               <Text selectable style={[styles.planName, { color: themeColors.text }]}>{t('proLifetimePlan')}</Text>
               <Text selectable style={[styles.planPrice, { color: themeColors.brand }]}>{t('proLifetimePrice')}</Text>
+              <Text selectable style={[styles.planMeta, { color: themeColors.textSecondary }]}>{t('proPrivilegeImagesTitle')}</Text>
               <Text selectable style={[styles.planMeta, { color: themeColors.textSecondary }]}>{t('proLifetimeBenefitRelay')}</Text>
               <Text selectable style={[styles.planMeta, { color: themeColors.textSecondary }]}>{t('proLifetimeBenefitUpdates')}</Text>
             </View>

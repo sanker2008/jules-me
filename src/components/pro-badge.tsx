@@ -33,6 +33,7 @@ export function ProBadge({
   const label = isLifetime ? t('proLifetimeBadge') : t('proBadge');
 
   const privileges = [
+    { icon: '📎', title: t('proPrivilegeImagesTitle'), desc: t('proPrivilegeImagesDesc') },
     { icon: '⚡', title: t('proPrivilegePromptsTitle'), desc: t('proPrivilegePromptsDesc') },
     { icon: '🎯', title: t('proPrivilegeRulesTitle'), desc: t('proPrivilegeRulesDesc') },
     { icon: '↻', title: t('proPrivilegeAutoApplyTitle'), desc: t('proPrivilegeAutoApplyDesc') },

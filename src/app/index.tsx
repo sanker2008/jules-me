@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { ImageBackground } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -46,6 +47,27 @@ const HOME_BACKGROUNDS = {
   light: require('@/assets/images/octopus-theme/home-background-light.png'),
   dark: require('@/assets/images/octopus-theme/home-background-dark.png'),
 } as const;
+
+function HomeTopBar({ children, theme }: { children: React.ReactNode; theme: 'light' | 'dark' }) {
+  if (isGlassEffectAPIAvailable()) {
+    return (
+      <GlassView
+        colorScheme={theme}
+        glassEffectStyle="clear"
+        tintColor={theme === 'dark' ? '#161422' : '#FFFFFF'}
+        style={styles.topBar}
+      >
+        {children}
+      </GlassView>
+    );
+  }
+
+  const fallbackColor = theme === 'dark'
+    ? 'rgba(15, 14, 23, 0.38)'
+    : 'rgba(255, 255, 255, 0.38)';
+
+  return <View style={[styles.topBar, { backgroundColor: fallbackColor }]}>{children}</View>;
+}
 
 function getRelativeTime(dateString: string | undefined, t: Translator): string {
   if (!dateString) return t('justUpdated');
@@ -424,15 +446,15 @@ export default function TaskHomeScreen() {
   );
 
   return (
-    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: themeColors.background }]}>
-      <ImageBackground
-        source={HOME_BACKGROUNDS[theme]}
-        style={[styles.screen, { backgroundColor: themeColors.background }]}
-        imageStyle={theme === 'dark' ? styles.homeBackgroundDark : styles.homeBackgroundLight}
-        contentFit="cover"
-        contentPosition="center"
-      >
-        <View style={[styles.topBar, { backgroundColor: themeColors.topBar, borderBottomColor: themeColors.topBarBorder }]}>
+    <ImageBackground
+      source={HOME_BACKGROUNDS[theme]}
+      style={[styles.screen, { backgroundColor: themeColors.background }]}
+      imageStyle={theme === 'dark' ? styles.homeBackgroundDark : styles.homeBackgroundLight}
+      contentFit="cover"
+      contentPosition="center"
+    >
+      <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safeArea}>
+        <HomeTopBar theme={theme}>
           <View style={styles.brandRow}>
             <Image source={require('@/assets/images/jules-logo.png')} style={styles.brandLogo} />
             <View>
@@ -468,7 +490,7 @@ export default function TaskHomeScreen() {
               <Text style={[styles.iconButtonText, { color: themeColors.brand }]}>⚙</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </HomeTopBar>
 
         {isLoadingWorkspace && !hasLoadedWorkspace ? (
           <View style={styles.initialLoading}>
@@ -744,7 +766,7 @@ export default function TaskHomeScreen() {
             </View>
           </ScrollView>
         )}
-      </ImageBackground>
+      </SafeAreaView>
 
       <Modal visible={pickerMode !== null} animationType="slide" transparent onRequestClose={() => setPickerMode(null)}>
         <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.sheetOverlay}>
@@ -820,7 +842,7 @@ export default function TaskHomeScreen() {
         purchaseUrl={PRO_PURCHASE_URL}
         t={t}
       />
-    </SafeAreaView>
+    </ImageBackground>
   );
 }
 

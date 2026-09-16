@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ProProvider } from '@/hooks/use-pro';
+import { AppLanguageProvider } from '@/i18n';
 import { AppThemeProvider, useAppTheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -24,9 +25,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppThemeProvider>
-        <ProProvider>
-          <RootNavigator />
-        </ProProvider>
+        <AppLanguageProvider>
+          <ProProvider>
+            <RootNavigator />
+          </ProProvider>
+        </AppLanguageProvider>
       </AppThemeProvider>
     </SafeAreaProvider>
   );

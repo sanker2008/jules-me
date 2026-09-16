@@ -187,7 +187,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: themeColors.background }]}>
-      <View style={[styles.topBar, { backgroundColor: themeColors.topBar }]}>
+      <View style={styles.topBar}>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={t('back')}

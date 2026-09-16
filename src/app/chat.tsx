@@ -50,6 +50,9 @@ import { getApiKey } from '../utils/secure-store';
 import { GradientButton } from '../components/gradient-button';
 import { usePro } from '../hooks/use-pro';
 import { ProBadge } from '../components/pro-badge';
+import { ProPaywallModal } from '../components/pro-paywall-modal';
+import { IS_PRO_ACTIVATION_AVAILABLE, PRO_PURCHASE_URL } from '../utils/license';
+import { canAttachProImage } from '../utils/pro-entitlements';
 import { LinearGradient } from 'expo-linear-gradient';
 
 type TimelineKind = 'user' | 'agent' | 'plan' | 'progress' | 'approved' | 'completed' | 'failed' | 'system';
@@ -233,7 +236,12 @@ export default function ChatScreen() {
   const sourceId = getSingleRouteParam(routeSourceId);
   const startingBranch = getSingleRouteParam(routeStartingBranch);
 
-  const { proState } = usePro();
+  const { proState, activate, isLoading: isProLoading } = usePro();
+  const [showProPaywall, setShowProPaywall] = useState(false);
+  const latestProState = useRef(proState);
+  useEffect(() => {
+    latestProState.current = proState;
+  }, [proState]);
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -397,6 +405,10 @@ export default function ChatScreen() {
   const handleSend = async () => {
     const prompt = inputText.trim();
     if ((!prompt && !selectedImage) || isSending) return;
+    if (selectedImage && (isProLoading || !canAttachProImage(proState))) {
+      if (!isProLoading) setShowProPaywall(true);
+      return;
+    }
     if (!apiKey) {
       setChatError(t('noApiKeySaved'));
       return;
@@ -542,6 +554,11 @@ export default function ChatScreen() {
   }, [activeState, proState.isPro]);
 
   const handlePickImage = async () => {
+    if (isProLoading || isSending) return;
+    if (!canAttachProImage(proState)) {
+      setShowProPaywall(true);
+      return;
+    }
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -550,6 +567,11 @@ export default function ChatScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
+        // Picking a photo can outlive the license or a change in activation.
+        if (!canAttachProImage(latestProState.current)) {
+          setShowProPaywall(true);
+          return;
+        }
         const imageAttachment = createImageAttachment(result.assets[0]);
         if (imageAttachment.error !== undefined) {
           setSelectedImage(null);
@@ -1214,12 +1236,13 @@ export default function ChatScreen() {
             <View style={styles.composerShell}>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={t('attachImage')}
+                accessibilityLabel={t('attachImagePro')}
                 style={[styles.attachButton, { backgroundColor: themeColors.composerBg }]}
                 onPress={handlePickImage}
-                disabled={isSending}
+                disabled={isSending || isProLoading}
               >
                 <Text style={[styles.attachButtonText, { color: themeColors.brand }]}>+</Text>
+                <Text style={{ fontSize: 8, fontWeight: '800', color: themeColors.brand }}>PRO</Text>
               </TouchableOpacity>
               <TextInput
                 accessibilityLabel={t('sendMessageToJules')}
@@ -1244,6 +1267,15 @@ export default function ChatScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+
+        <ProPaywallModal
+          visible={showProPaywall}
+          onDismiss={() => setShowProPaywall(false)}
+          onActivate={activate}
+          activationAvailable={IS_PRO_ACTIVATION_AVAILABLE}
+          purchaseUrl={PRO_PURCHASE_URL}
+          t={t}
+        />
 
         <Modal
           visible={Boolean(previewImageUri)}

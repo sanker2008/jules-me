@@ -1,6 +1,6 @@
 # JulesMe Pro 实施状态
 
-> 最后更新：2026-09-07
+> 最后更新：2026-09-08
 > 状态约定：**已完成** 表示客户端代码与自动化校验已完成；**待服务端** 表示不能仅靠客户端安全交付；**未开始** 表示尚未实现。
 
 ## 阶段一：Pro 核心底座与鉴权
@@ -14,6 +14,7 @@
 | 全局 Pro 状态 | 已完成 | `src/hooks/use-pro.tsx` |
 | 设置页 Pro 卡片与脱敏授权码 | 已完成 | `src/app/settings.tsx` |
 | 双套餐与激活底部弹层 | 已完成 | `src/components/pro-paywall-modal.tsx` |
+| Pro 专属图片附件入口、选择返回与发送前权益检查 | 已完成 | `src/app/chat.tsx`、`src/utils/pro-entitlements.ts` |
 | 自定义 Prompt 的新增、删除、复用与本地持久化 | 已完成 | `src/components/custom-prompts-modal.tsx`、`src/utils/pro-storage.ts` |
 | 全局编码规范保存、自动注入与生效提示 | 已完成 | `src/app/settings.tsx`、`src/app/index.tsx` |
 | 基于真实改动、命令与 Pull Request 的交付战报 | 已完成 | `src/app/chat.tsx` |
@@ -22,6 +23,8 @@
 
 ### 客户端行为
 
+- 图片附件为月度和终身 Pro 专属：Free 点击附件入口进入 Pro 说明，不打开图片选择器；选择返回和发送前再次检查授权及到期时间。文字任务、历史图片和产物预览继续对 Free 开放。
+- 当前 Pro 图片附件沿用本地图片读取与 Base64 提交；独立图片上传、R2 和服务端上传鉴权尚未实现，不代表已经提供云图床。
 - 原生端将授权状态和设备标识写入 `expo-secure-store`；Web 端使用浏览器本地存储。
 - 月度授权在本地到期后自动回退为 Free；结构异常或损坏的缓存不会授予 Pro。
 - 客户端不再请求未上线的默认域名。只有构建时显式设置有效 HTTPS `EXPO_PUBLIC_LICENSE_VERIFY_ENDPOINT` 才开放激活；未配置时设置页显示“即将上线”的不可用状态。
@@ -60,6 +63,14 @@
 - `npm run typecheck`、`npm run lint`、`npm run export:web` 与 `npx expo install --check`：全部通过。
 - 使用 Codex 内置浏览器验收桌面与 `390 × 844` 手机视口：首页、设置页、简中/英文切换和 Pro 弹层均无布局溢出，浏览器控制台无运行时错误。
 - 直接打开或刷新 `/settings` 后点击返回，会安全回到首页，不再触发未处理的 `GO_BACK`。
+
+2026-09-08 图片附件权益调整验证：
+
+- `npm run typecheck`、`npm run lint`、`npm test` 通过：35 项应用测试与 14 项发布保护测试。
+- Web 导出首次遇到 Node 内存不足，使用 `npx expo export --platform web --output-dir dist --clear --max-workers 1` 重试通过。
+- 新增权益测试覆盖 Free、取消激活、月度授权在操作期间到期、终身授权与不完整授权。
+- Codex 内置浏览器验证聊天页附件入口会为 Free 打开 Pro 弹层，保留文字草稿；`390 × 844` 视口无横向溢出。控制台无运行时错误，存在已有的样式属性弃用警告。
+- 尚未进行真实授权激活、真实 Jules 图片请求或 Android 原生相册联调。
 
 ## 后续阶段
 

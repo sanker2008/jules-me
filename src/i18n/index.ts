@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Platform } from 'react-native';
 import * as Localization from 'expo-localization';
 import * as SecureStore from 'expo-secure-store';
@@ -82,14 +83,24 @@ export async function saveLanguagePreference(language: LanguagePreference) {
   }
 }
 
-export function useAppLanguage() {
+interface LanguageContextValue {
+  language: AppLanguage;
+  preference: LanguagePreference;
+  setPreference: (preference: LanguagePreference) => Promise<void>;
+}
+
+const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+export function AppLanguageProvider({ children }: { children: ReactNode }) {
   const locales = Localization.useLocales();
-  const [preference, setPreferenceState] = useState<LanguagePreference>('system');
+  const [storedPreference, setPreferenceState] = useState<LanguagePreference | null>(null);
+  const preference = storedPreference ?? 'system';
 
   useEffect(() => {
     let disposed = false;
     void getLanguagePreference().then(language => {
-      if (!disposed) setPreferenceState(language);
+      // A delayed storage read must not overwrite a selection made after startup.
+      if (!disposed) setPreferenceState(current => current ?? language);
     });
     return () => {
       disposed = true;
@@ -112,12 +123,23 @@ export function useAppLanguage() {
     return resolveSystemLanguage();
   }, [locales, preference]);
 
-  const setPreference = async (languagePreference: LanguagePreference) => {
+  const setPreference = useCallback(async (languagePreference: LanguagePreference) => {
     setPreferenceState(languagePreference);
     await saveLanguagePreference(languagePreference);
-  };
+  }, []);
 
-  return { language, preference, setPreference };
+  const value = useMemo(
+    () => ({ language, preference, setPreference }),
+    [language, preference, setPreference],
+  );
+
+  return createElement(LanguageContext.Provider, { value }, children);
+}
+
+export function useAppLanguage() {
+  const context = useContext(LanguageContext);
+  if (!context) throw new Error('useAppLanguage must be used within AppLanguageProvider');
+  return context;
 }
 
 type TranslationValue = string | ((...args: any[]) => string);
@@ -307,6 +329,9 @@ const zhHans = {
   imageAttachmentTooLarge: '图片不能超过 5 MB。',
   imageAttachmentUnsupportedType: '仅支持 GIF、JPEG、PNG 或 WebP 图片。',
   attachImage: '附加图片',
+  attachImagePro: '附加图片（Pro 专属）',
+  proPrivilegeImagesTitle: '图片附件',
+  proPrivilegeImagesDesc: '在任务中附加截图或参考图片，补充文字说明。',
   imageSelectionFailed: '图片选择失败，请重试。',
   copyDiff: '复制 Diff',
   diffCopied: '已复制 Diff',
@@ -599,6 +624,9 @@ const zhHant = {
   imageAttachmentTooLarge: '圖片不能超過 5 MB。',
   imageAttachmentUnsupportedType: '僅支援 GIF、JPEG、PNG 或 WebP 圖片。',
   attachImage: '附加圖片',
+  attachImagePro: '附加圖片（Pro 專屬）',
+  proPrivilegeImagesTitle: '圖片附件',
+  proPrivilegeImagesDesc: '在任務中附加截圖或參考圖片，補充文字說明。',
   imageSelectionFailed: '選擇圖片失敗，請重試。',
   copyDiff: '複製 Diff',
   diffCopied: '已複製 Diff',
@@ -889,6 +917,9 @@ const en = {
   imageAttachmentTooLarge: 'Images must be 5 MB or smaller.',
   imageAttachmentUnsupportedType: 'Only GIF, JPEG, PNG, and WebP images are supported.',
   attachImage: 'Attach image',
+  attachImagePro: 'Attach image (Pro only)',
+  proPrivilegeImagesTitle: 'Image attachments',
+  proPrivilegeImagesDesc: 'Attach screenshots or reference images to give tasks more context.',
   imageSelectionFailed: 'Unable to select the image. Try again.',
   copyDiff: 'Copy Diff',
   diffCopied: 'Diff Copied',
