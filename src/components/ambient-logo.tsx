@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, AppState, Easing, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
@@ -6,7 +6,7 @@ import { useFocusEffect } from 'expo-router';
 export function AmbientLogo({ theme }: { theme: 'light' | 'dark' }) {
   const { width, height } = useWindowDimensions();
   const size = Math.min(width * 1.05, height * 0.62, 560);
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
   const [isFocused, setIsFocused] = useState(false);
   useFocusEffect(useCallback(() => {
     setIsFocused(true);
