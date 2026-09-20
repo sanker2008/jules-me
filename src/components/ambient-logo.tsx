@@ -77,5 +77,5 @@ export function AmbientLogo({ theme }: { theme: 'light' | 'dark' }) {
 }
 
 const styles = StyleSheet.create({
-  layer: { ...StyleSheet.absoluteFillObject, alignItems: 'center', overflow: 'hidden' },
+  layer: { ...StyleSheet.absoluteFill, alignItems: 'center', overflow: 'hidden' },
 });
