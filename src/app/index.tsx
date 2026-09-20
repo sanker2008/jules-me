@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
+import { BlurTargetView, BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { ImageBackground } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,6 +31,7 @@ import { useTheme } from '../hooks/use-theme';
 import { cleanPromptDisplay, getSingleRouteParam } from '../utils/jules-guards';
 import { getApiKey } from '../utils/secure-store';
 import { BreathingLogo } from '../components/breathing-logo';
+import { AmbientLogo } from '../components/ambient-logo';
 import { Chevron } from '../components/chevron';
 import { GradientButton } from '../components/gradient-button';
 import { usePro } from '../hooks/use-pro';
@@ -48,25 +49,22 @@ const HOME_BACKGROUNDS = {
   dark: require('@/assets/images/octopus-theme/home-background-dark.png'),
 } as const;
 
-function HomeTopBar({ children, theme }: { children: React.ReactNode; theme: 'light' | 'dark' }) {
-  if (isGlassEffectAPIAvailable()) {
-    return (
-      <GlassView
-        colorScheme={theme}
-        glassEffectStyle="clear"
-        tintColor={theme === 'dark' ? '#161422' : '#FFFFFF'}
-        style={styles.topBar}
-      >
-        {children}
-      </GlassView>
-    );
-  }
-
-  const fallbackColor = theme === 'dark'
-    ? 'rgba(15, 14, 23, 0.38)'
-    : 'rgba(255, 255, 255, 0.38)';
-
-  return <View style={[styles.topBar, { backgroundColor: fallbackColor }]}>{children}</View>;
+function HomeTopBar({ children, theme, blurTarget }: {
+  children: React.ReactNode;
+  theme: 'light' | 'dark';
+  blurTarget: React.RefObject<View | null>;
+}) {
+  return (
+    <BlurView
+      blurTarget={blurTarget}
+      blurMethod="dimezisBlurViewSdk31Plus"
+      intensity={35}
+      tint={theme === 'dark' ? 'dark' : 'light'}
+      style={styles.topBar}
+    >
+      {children}
+    </BlurView>
+  );
 }
 
 function getRelativeTime(dateString: string | undefined, t: Translator): string {
@@ -130,6 +128,7 @@ function isActive(session: Session) {
 }
 
 export default function TaskHomeScreen() {
+  const backgroundRef = useRef<View | null>(null);
   const router = useRouter();
   const themeColors = useTheme();
   const { theme } = useAppTheme();
@@ -446,15 +445,19 @@ export default function TaskHomeScreen() {
   );
 
   return (
-    <ImageBackground
-      source={HOME_BACKGROUNDS[theme]}
-      style={[styles.screen, { backgroundColor: themeColors.background }]}
-      imageStyle={theme === 'dark' ? styles.homeBackgroundDark : styles.homeBackgroundLight}
-      contentFit="cover"
-      contentPosition="center"
-    >
+    <View style={[styles.screen, { backgroundColor: themeColors.background }]}>
+      <BlurTargetView ref={backgroundRef} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <ImageBackground
+          source={HOME_BACKGROUNDS[theme]}
+          style={styles.screen}
+          imageStyle={theme === 'dark' ? styles.homeBackgroundDark : styles.homeBackgroundLight}
+          contentFit="cover"
+          contentPosition="center"
+        />
+        <AmbientLogo theme={theme} />
+      </BlurTargetView>
       <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safeArea}>
-        <HomeTopBar theme={theme}>
+        <HomeTopBar theme={theme} blurTarget={backgroundRef}>
           <View style={styles.brandRow}>
             <Image source={require('@/assets/images/jules-logo.png')} style={styles.brandLogo} />
             <View>
@@ -842,7 +845,7 @@ export default function TaskHomeScreen() {
         purchaseUrl={PRO_PURCHASE_URL}
         t={t}
       />
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -852,6 +855,7 @@ const styles = StyleSheet.create({
   homeBackgroundLight: { opacity: 0.82 },
   homeBackgroundDark: { opacity: 0.7 },
   topBar: {
+    overflow: 'hidden',
     minHeight: 70,
     paddingHorizontal: 20,
     paddingVertical: 12,
