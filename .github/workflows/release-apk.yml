@@ -56,6 +56,11 @@ jobs:
 
   build-apk:
     name: Build APK (${{ matrix.abi }})
+    env:
+      JULESME_DISTRIBUTION: github
+      JULESME_EAS_PROJECT_ID: ${{ vars.JULESME_EAS_PROJECT_ID }}
+      JULESME_UPDATES_URL: ${{ vars.JULESME_UPDATES_URL }}
+      JULESME_UPDATE_CHANNEL: ${{ vars.JULESME_GITHUB_UPDATE_CHANNEL }}
     needs: quality
     environment: android-release
     runs-on: ubuntu-latest
@@ -197,6 +202,11 @@ jobs:
 
   build-aab:
     name: Build Android App Bundle
+    env:
+      JULESME_DISTRIBUTION: play
+      JULESME_EAS_PROJECT_ID: ${{ vars.JULESME_EAS_PROJECT_ID }}
+      JULESME_UPDATES_URL: ${{ vars.JULESME_UPDATES_URL }}
+      JULESME_UPDATE_CHANNEL: ${{ vars.JULESME_PLAY_UPDATE_CHANNEL }}
     needs: quality
     environment: android-release
     runs-on: ubuntu-latest

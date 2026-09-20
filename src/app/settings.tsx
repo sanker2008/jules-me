@@ -10,10 +10,12 @@ import {
   View,
 } from 'react-native';
 import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProPaywallModal } from '../components/pro-paywall-modal';
+import { AppUpdateCard } from '../components/app-update-card';
 import { Chevron } from '../components/chevron';
 import { GradientButton } from '../components/gradient-button';
 import { ProBadge } from '../components/pro-badge';
@@ -101,9 +103,10 @@ export default function SettingsScreen() {
   const [isSavingInstructions, setIsSavingInstructions] = useState(false);
   const [instructionsFeedback, setInstructionsFeedback] = useState<string | null>(null);
 
-  const appVersion = Constants.expoConfig?.version ?? '1.0.1';
-  const buildNumber = Constants.expoConfig?.ios?.buildNumber
-    ?? (Constants.expoConfig?.android?.versionCode ? String(Constants.expoConfig.android.versionCode) : '1');
+  const appVersion = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '1.0.1';
+  const buildNumber = Application.nativeBuildVersion ?? (Platform.OS === 'ios'
+    ? Constants.expoConfig?.ios?.buildNumber
+    : String(Constants.expoConfig?.android?.versionCode ?? '1'));
   const appMetadata = Constants.expoConfig?.extra?.appMetadata as { author?: string; brand?: string } | undefined;
   const author = appMetadata?.author ?? 'San';
   const brand = appMetadata?.brand ?? 'sanOmni';
@@ -475,6 +478,8 @@ export default function SettingsScreen() {
             <Text style={[styles.releaseNotesText, { color: themeColors.textSecondary }]}>{t('releaseNotesText')}</Text>
           </View>
         </View>
+
+        <AppUpdateCard />
 
         {/* JulesMe Pro Section */}
         <View style={[styles.proCard, proCardColors]}>
