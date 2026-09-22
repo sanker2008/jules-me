@@ -15,11 +15,11 @@ import { useAppTheme } from '../theme';
 import { useTheme } from '../hooks/use-theme';
 
 export interface GradientButtonProps {
-  variant?: 'primary' | 'accent';
   onPress?: (event: GestureResponderEvent) => void;
   disabled?: boolean;
   loading?: boolean;
   loadingText?: string;
+  loadingIndicatorColor?: string;
   title?: string;
   children?: React.ReactNode;
   icon?: React.ReactNode;
@@ -32,11 +32,11 @@ export interface GradientButtonProps {
 }
 
 export function GradientButton({
-  variant = 'primary',
   onPress,
   disabled = false,
   loading = false,
   loadingText,
+  loadingIndicatorColor,
   title,
   children,
   icon,
@@ -49,14 +49,13 @@ export function GradientButton({
 }: GradientButtonProps) {
   const { theme } = useAppTheme();
   const colorsTheme = useTheme();
-  const foreground = variant === 'accent' ? '#24391B' : '#FFFFFF';
 
   const isDark = theme === 'dark';
   const defaultColors: [string, string] = isDark
     ? ['#9987FA', '#6246E5']
     : ['#765BF8', '#4B30D1'];
 
-  const colors = gradientColors ?? (variant === 'accent' ? [colorsTheme.accent, colorsTheme.accent] as [string, string] : defaultColors);
+  const colors = gradientColors ?? defaultColors;
 
   return (
     <TouchableOpacity
@@ -79,15 +78,15 @@ export function GradientButton({
       >
         {loading ? (
           <View style={styles.contentRow}>
-            <ActivityIndicator size="small" color={foreground} />
-            {loadingText ? <Text style={[styles.text, { color: foreground }, textStyle]}>{loadingText}</Text> : null}
+            <ActivityIndicator size="small" color={loadingIndicatorColor ?? colorsTheme.accent} />
+            {loadingText ? <Text style={[styles.text, textStyle]}>{loadingText}</Text> : null}
           </View>
         ) : children ? (
           children
         ) : (
           <View style={styles.contentRow}>
             {icon}
-            {title ? <Text style={[styles.text, { color: foreground }, textStyle]}>{title}</Text> : null}
+            {title ? <Text style={[styles.text, textStyle]}>{title}</Text> : null}
           </View>
         )}
       </LinearGradient>

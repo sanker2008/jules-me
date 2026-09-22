@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Feather from '@expo/vector-icons/Feather';
 import {
   ActivityIndicator,
   Image,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -31,6 +33,7 @@ import { useTheme } from '../hooks/use-theme';
 import { cleanPromptDisplay, getSingleRouteParam } from '../utils/jules-guards';
 import { getApiKey } from '../utils/secure-store';
 import { AmbientLogo } from '../components/ambient-logo';
+import { RefreshIcon } from '../components/refresh-icon';
 import { Chevron } from '../components/chevron';
 import { GradientButton } from '../components/gradient-button';
 import { usePro } from '../hooks/use-pro';
@@ -413,7 +416,7 @@ export default function TaskHomeScreen() {
         key={session.name}
         accessibilityRole="button"
         accessibilityLabel={t('openSession', title)}
-        style={[styles.sessionCard, { backgroundColor: themeColors.backgroundElement }]}
+        style={[styles.sessionCard, { backgroundColor: themeColors.card }]}
         onPress={() => resumeSession(session)}
       >
         <View style={styles.sessionCardHeader}>
@@ -455,6 +458,23 @@ export default function TaskHomeScreen() {
         />
         <AmbientLogo theme={theme} />
       </BlurTargetView>
+      {savedApiKey ? (
+        <BlurView
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          blurTarget={backgroundRef}
+          blurMethod="dimezisBlurViewSdk31Plus"
+          intensity={40}
+          tint={theme === 'dark' ? 'dark' : 'light'}
+          style={StyleSheet.absoluteFill}
+        >
+          <View style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: themeColors.background, opacity: theme === 'dark' ? 0.4 : 0.3 },
+          ]} />
+        </BlurView>
+      ) : null}
       <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safeArea}>
         <HomeTopBar theme={theme} blurTarget={backgroundRef}>
           <View style={styles.brandRow}>
@@ -472,31 +492,32 @@ export default function TaskHomeScreen() {
           <View style={styles.topActions}>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={t('refreshWorkspace')}
+              accessibilityLabel={t(isLoadingWorkspace ? 'syncingWorkspace' : 'refreshWorkspace')}
+              accessibilityState={{ busy: isLoadingWorkspace, disabled: !savedApiKey || isLoadingWorkspace }}
               disabled={!savedApiKey || isLoadingWorkspace}
               onPress={refreshWorkspace}
               style={[
                 styles.iconButton,
                 { backgroundColor: themeColors.brandSubtle },
-                (!savedApiKey || isLoadingWorkspace) && styles.iconButtonDisabled,
+                !savedApiKey && styles.iconButtonDisabled,
               ]}
             >
-              <Text style={[styles.iconButtonText, styles.refreshIconText, { color: themeColors.brand }]}>↻</Text>
+              <RefreshIcon refreshing={isLoadingWorkspace} color={themeColors.brand} />
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={t('openSettings')}
               onPress={() => router.push('/settings' as any)}
-              style={[styles.iconButton, { backgroundColor: themeColors.accentSubtle }]}
+              style={[styles.iconButton, { backgroundColor: themeColors.brandSubtle }]}
             >
-              <Text style={[styles.iconButtonText, { color: themeColors.accentText }]}>⚙</Text>
+              <Feather name="settings" size={20} color={themeColors.brand} />
             </TouchableOpacity>
           </View>
         </HomeTopBar>
 
         {isLoadingWorkspace && !hasLoadedWorkspace ? (
           <View style={styles.initialLoading}>
-            <ActivityIndicator size="large" color={themeColors.brand} />
+            <ActivityIndicator size="large" color={themeColors.accent} />
             <Text style={[styles.initialLoadingText, { color: themeColors.textSecondary }]}>{t('syncingWorkspace')}</Text>
           </View>
         ) : !savedApiKey ? (
@@ -504,7 +525,7 @@ export default function TaskHomeScreen() {
             <Text style={[styles.initialLoadingTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
             <Text style={[styles.initialLoadingText, { color: themeColors.textSecondary }]}>{t('apiKeyStartHint')}</Text>
             <GradientButton
-              variant="accent"
+
               title={t('configureApiKey')}
               onPress={() => router.push('/settings' as any)}
               style={styles.primaryButton}
@@ -516,9 +537,9 @@ export default function TaskHomeScreen() {
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
-            refreshControl={<RefreshControl refreshing={isLoadingWorkspace} onRefresh={refreshWorkspace} tintColor={themeColors.brand} />}
+            refreshControl={<RefreshControl refreshing={isLoadingWorkspace} onRefresh={refreshWorkspace} tintColor={themeColors.accent} colors={[themeColors.accent]} />}
           >
-            <View style={[styles.hero, { backgroundColor: themeColors.backgroundElement }]}>
+            <View style={[styles.hero, { backgroundColor: themeColors.card }]}>
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={t('newTask')}
@@ -528,7 +549,7 @@ export default function TaskHomeScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.heroHeaderCopy}>
-                  <Text style={[styles.eyebrow, { color: themeColors.accentText }]}>{t('newTask')}</Text>
+                  <Text style={[styles.eyebrow, { color: themeColors.brand }]}>{t('newTask')}</Text>
                   <Text style={[styles.heroHeaderTitle, { color: themeColors.text }]} numberOfLines={1}>
                     {isFormExpanded
                       ? t('heroTitle')
@@ -629,10 +650,10 @@ export default function TaskHomeScreen() {
                       <TouchableOpacity
                         key={template}
                         accessibilityState={{ selected: taskPrompt === template }}
-                        style={[styles.templateChip, { backgroundColor: taskPrompt === template ? themeColors.accentSubtle : themeColors.chipBg }]}
+                        style={[styles.templateChip, { backgroundColor: taskPrompt === template ? themeColors.brandSubtle : themeColors.chipBg }]}
                         onPress={() => setTaskPrompt(template)}
                       >
-                        <Text style={[styles.templateText, { color: taskPrompt === template ? themeColors.accentText : themeColors.textSecondary }]}>{template}</Text>
+                        <Text style={[styles.templateText, { color: taskPrompt === template ? themeColors.brand : themeColors.textSecondary }]}>{template}</Text>
                       </TouchableOpacity>
                     ))}
                     {customPrompts.map(cp => (
@@ -670,8 +691,9 @@ export default function TaskHomeScreen() {
                     <Switch
                       value={requirePlanApproval}
                       onValueChange={setRequirePlanApproval}
-                      trackColor={{ false: themeColors.composerBorder, true: themeColors.accentText }}
-                      thumbColor={requirePlanApproval ? themeColors.brand : '#FFFFFF'}
+                      trackColor={{ false: themeColors.backgroundSelected, true: themeColors.brand }}
+                      thumbColor="#FFFFFF"
+                      {...(Platform.OS === 'web' ? { activeThumbColor: '#FFFFFF' } : {})}
                     />
                   </View>
                   <View style={styles.optionRow}>
@@ -682,8 +704,9 @@ export default function TaskHomeScreen() {
                     <Switch
                       value={autoCreatePr}
                       onValueChange={setAutoCreatePr}
-                      trackColor={{ false: themeColors.composerBorder, true: themeColors.accentText }}
-                      thumbColor={autoCreatePr ? themeColors.brand : '#FFFFFF'}
+                      trackColor={{ false: themeColors.backgroundSelected, true: themeColors.brand }}
+                      thumbColor="#FFFFFF"
+                      {...(Platform.OS === 'web' ? { activeThumbColor: '#FFFFFF' } : {})}
                     />
                   </View>
                 </View>
@@ -701,7 +724,7 @@ export default function TaskHomeScreen() {
             ) : null}
 
             {recentSessions.length > 0 ? (
-              <View style={[styles.searchBarContainer, { backgroundColor: themeColors.backgroundElement }]}>
+              <View style={[styles.searchBarContainer, { backgroundColor: themeColors.card }]}>
                 <Text style={styles.searchIcon}>🔍</Text>
                 <TextInput
                   accessibilityLabel={t('searchSessions')}
@@ -757,7 +780,7 @@ export default function TaskHomeScreen() {
                   onPress={loadMoreSessions}
                   disabled={isLoadingMoreSessions}
                 >
-                  {isLoadingMoreSessions ? <ActivityIndicator size="small" color={themeColors.brand} /> : <Text style={[styles.loadMoreText, { color: themeColors.brand }]}>{t('loadMoreSessions')}</Text>}
+                  {isLoadingMoreSessions ? <ActivityIndicator size="small" color={themeColors.accent} /> : <Text style={[styles.loadMoreText, { color: themeColors.brand }]}>{t('loadMoreSessions')}</Text>}
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -794,7 +817,7 @@ export default function TaskHomeScreen() {
                       {source.githubRepo?.isPrivate ? t('privateRepository') : t('githubRepository')} · {source.githubRepo?.defaultBranch?.displayName || t('noDefaultBranch')}
                     </Text>
                   </View>
-                  {selectedSourceName === source.name ? <Text style={[styles.selectedMark, { color: themeColors.accentText }]}>✓</Text> : null}
+                  {selectedSourceName === source.name ? <Text style={[styles.selectedMark, { color: themeColors.brand }]}>✓</Text> : null}
                 </TouchableOpacity>
               )) : availableBranches.map(branch => (
                 <TouchableOpacity
@@ -806,7 +829,7 @@ export default function TaskHomeScreen() {
                   }}
                 >
                   <Text style={[styles.sheetItemTitle, { color: themeColors.text }]}>{branch}</Text>
-                  {selectedBranch === branch ? <Text style={[styles.selectedMark, { color: themeColors.accentText }]}>✓</Text> : null}
+                  {selectedBranch === branch ? <Text style={[styles.selectedMark, { color: themeColors.brand }]}>✓</Text> : null}
                 </TouchableOpacity>
               ))}
               {pickerMode === 'branch' && availableBranches.length === 0 ? (
@@ -814,7 +837,7 @@ export default function TaskHomeScreen() {
               ) : null}
               {pickerMode === 'source' && sourcesNextPageToken ? (
                 <TouchableOpacity style={[styles.loadMoreButton, { borderColor: themeColors.composerBorder }]} onPress={loadMoreSources} disabled={isLoadingMoreSources}>
-                  {isLoadingMoreSources ? <ActivityIndicator size="small" color={themeColors.brand} /> : <Text style={[styles.loadMoreText, { color: themeColors.brand }]}>{t('loadMoreRepositories')}</Text>}
+                  {isLoadingMoreSources ? <ActivityIndicator size="small" color={themeColors.accent} /> : <Text style={[styles.loadMoreText, { color: themeColors.brand }]}>{t('loadMoreRepositories')}</Text>}
                 </TouchableOpacity>
               ) : null}
             </ScrollView>
@@ -890,15 +913,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconButtonDisabled: { opacity: 0.45 },
-  iconButtonText: {
-    fontSize: 20,
-    lineHeight: 20,
-    fontWeight: '600',
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    includeFontPadding: false,
-  },
-  refreshIconText: { marginTop: -2 },
+
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40, gap: 24 },
   initialLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 38, gap: 12 },

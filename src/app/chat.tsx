@@ -927,7 +927,7 @@ export default function ChatScreen() {
 
   const listFooter = activitiesNextPageToken ? (
     <TouchableOpacity style={[styles.historyButton, { backgroundColor: themeColors.backgroundElement }]} onPress={loadOlderActivities} disabled={isLoadingHistory}>
-      {isLoadingHistory ? <ActivityIndicator size="small" color={themeColors.brand} /> : <Text style={[styles.historyButtonText, { color: themeColors.brand }]}>{t('loadOlderActivities')}</Text>}
+      {isLoadingHistory ? <ActivityIndicator size="small" color={themeColors.accent} /> : <Text style={[styles.historyButtonText, { color: themeColors.brand }]}>{t('loadOlderActivities')}</Text>}
     </TouchableOpacity>
   ) : null;
 
@@ -1106,7 +1106,7 @@ export default function ChatScreen() {
           )}
           ListEmptyComponent={(
             <View style={styles.emptyState}>
-              {isRefreshing ? <ActivityIndicator color={themeColors.brand} /> : null}
+              {isRefreshing ? <ActivityIndicator color={themeColors.accent} /> : null}
               <Text style={[styles.emptyStateTitle, { color: themeColors.text }]}>{sessionId ? t('loadingSessionActivities') : t('describeTaskForJules')}</Text>
               <Text style={[styles.emptyStateText, { color: themeColors.textSecondary }]}>
                 {sessionId ? t('activityPlaceholder') : t('taskRunsOn', displaySource, startingBranch || t('selectedBranch'))}
@@ -1170,7 +1170,7 @@ export default function ChatScreen() {
 
         {isWorkingState(activeState) ? (
           <View accessibilityLiveRegion="polite" style={[styles.workingIndicator, { backgroundColor: themeColors.brandSubtle }]}>
-            <ActivityIndicator size="small" color={themeColors.brand} />
+            <ActivityIndicator size="small" color={themeColors.accent} />
             <Text style={[styles.workingIndicatorText, { color: themeColors.brand }]}>{t('julesWorking')}</Text>
           </View>
         ) : null}

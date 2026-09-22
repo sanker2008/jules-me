@@ -2,9 +2,10 @@
   "name": "julesme",
   "author": "San",
   "main": "expo-router/entry",
-  "version": "1.1.24",
+  "version": "1.1.25",
   "dependencies": {
     "@expo/ui": "~57.0.19",
+    "@expo/vector-icons": "^15.0.2",
     "expo": "~57.0.24",
     "expo-application": "~57.0.3",
     "expo-blur": "~57.0.3",

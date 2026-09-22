@@ -255,8 +255,11 @@ export default function SettingsScreen() {
             disabled={isConnecting}
             loading={isConnecting}
             loadingText={t('connecting')}
-            variant="accent"
+
             title={t('saveAndConnect')}
+            gradientColors={[themeColors.accent, themeColors.accent]}
+            textStyle={{ color: '#24391B' }}
+            loadingIndicatorColor="#24391B"
             accessibilityLabel={isConnecting ? t('connecting') : t('saveAndConnect')}
             onPress={handleSaveApiKey}
             style={styles.saveButton}
@@ -268,7 +271,7 @@ export default function SettingsScreen() {
                 styles.statusBanner,
                 {
                   backgroundColor: connectionStatus.type === 'success'
-                    ? themeColors.accentSubtle
+                    ? themeColors.statusCompleteBg
                     : (theme === 'dark' ? '#3B191B' : '#FFE8E7'),
                 },
               ]}
@@ -278,7 +281,7 @@ export default function SettingsScreen() {
                   styles.statusBannerText,
                   {
                     color: connectionStatus.type === 'success'
-                      ? themeColors.accentText
+                      ? themeColors.statusCompleteText
                       : (theme === 'dark' ? '#FF8585' : '#D1242F'),
                   },
                 ]}
@@ -321,7 +324,7 @@ export default function SettingsScreen() {
                   accessibilityState={{ selected: themePreference === option }}
                   style={[
                     styles.menuItem,
-                    themePreference === option && { backgroundColor: themeColors.accentSubtle },
+                    themePreference === option && { backgroundColor: themeColors.brandSubtle },
                   ]}
                   onPress={() => {
                     setShowThemeMenu(false);
@@ -331,7 +334,7 @@ export default function SettingsScreen() {
                   <Text style={[styles.menuItemText, { color: themePreference === option ? themeColors.brand : themeColors.text }]}>
                     {getThemeName(option, t)}
                   </Text>
-                  {themePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.accentText }]}>✓</Text> : null}
+                  {themePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.brand }]}>✓</Text> : null}
                 </TouchableOpacity>
               ))}
             </View>
@@ -369,7 +372,7 @@ export default function SettingsScreen() {
                   accessibilityState={{ selected: languagePreference === option }}
                   style={[
                     styles.menuItem,
-                    languagePreference === option && { backgroundColor: themeColors.accentSubtle },
+                    languagePreference === option && { backgroundColor: themeColors.brandSubtle },
                   ]}
                   onPress={() => {
                     setShowLanguageMenu(false);
@@ -379,7 +382,7 @@ export default function SettingsScreen() {
                   <Text style={[styles.menuItemText, { color: languagePreference === option ? themeColors.brand : themeColors.text }]}>
                     {getLanguageName(option)}
                   </Text>
-                  {languagePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.accentText }]}>✓</Text> : null}
+                  {languagePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.brand }]}>✓</Text> : null}
                 </TouchableOpacity>
               ))}
             </View>
@@ -422,7 +425,7 @@ export default function SettingsScreen() {
           {isProActive ? (
             <View style={styles.instructionsActions}>
               {instructionsFeedback ? (
-                <Text style={[styles.instructionsFeedback, { color: themeColors.accentText }]}>
+                <Text style={[styles.instructionsFeedback, { color: themeColors.brand }]}>
                   ✓ {instructionsFeedback}
                 </Text>
               ) : <View />}
