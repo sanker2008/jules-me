@@ -255,6 +255,7 @@ export default function SettingsScreen() {
             disabled={isConnecting}
             loading={isConnecting}
             loadingText={t('connecting')}
+            variant="accent"
             title={t('saveAndConnect')}
             accessibilityLabel={isConnecting ? t('connecting') : t('saveAndConnect')}
             onPress={handleSaveApiKey}
@@ -267,7 +268,7 @@ export default function SettingsScreen() {
                 styles.statusBanner,
                 {
                   backgroundColor: connectionStatus.type === 'success'
-                    ? (theme === 'dark' ? '#143823' : '#E7F8EE')
+                    ? themeColors.accentSubtle
                     : (theme === 'dark' ? '#3B191B' : '#FFE8E7'),
                 },
               ]}
@@ -277,7 +278,7 @@ export default function SettingsScreen() {
                   styles.statusBannerText,
                   {
                     color: connectionStatus.type === 'success'
-                      ? (theme === 'dark' ? '#5CE091' : '#177B41')
+                      ? themeColors.accentText
                       : (theme === 'dark' ? '#FF8585' : '#D1242F'),
                   },
                 ]}

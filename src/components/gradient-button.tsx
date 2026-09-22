@@ -12,8 +12,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '../theme';
+import { useTheme } from '../hooks/use-theme';
 
 export interface GradientButtonProps {
+  variant?: 'primary' | 'accent';
   onPress?: (event: GestureResponderEvent) => void;
   disabled?: boolean;
   loading?: boolean;
@@ -30,6 +32,7 @@ export interface GradientButtonProps {
 }
 
 export function GradientButton({
+  variant = 'primary',
   onPress,
   disabled = false,
   loading = false,
@@ -45,13 +48,15 @@ export function GradientButton({
   accessibilityRole = 'button',
 }: GradientButtonProps) {
   const { theme } = useAppTheme();
+  const colorsTheme = useTheme();
+  const foreground = variant === 'accent' ? '#24391B' : '#FFFFFF';
 
   const isDark = theme === 'dark';
   const defaultColors: [string, string] = isDark
     ? ['#9987FA', '#6246E5']
     : ['#765BF8', '#4B30D1'];
 
-  const colors = gradientColors ?? defaultColors;
+  const colors = gradientColors ?? (variant === 'accent' ? [colorsTheme.accent, colorsTheme.accent] as [string, string] : defaultColors);
 
   return (
     <TouchableOpacity
@@ -74,15 +79,15 @@ export function GradientButton({
       >
         {loading ? (
           <View style={styles.contentRow}>
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            {loadingText ? <Text style={[styles.text, textStyle]}>{loadingText}</Text> : null}
+            <ActivityIndicator size="small" color={foreground} />
+            {loadingText ? <Text style={[styles.text, { color: foreground }, textStyle]}>{loadingText}</Text> : null}
           </View>
         ) : children ? (
           children
         ) : (
           <View style={styles.contentRow}>
             {icon}
-            {title ? <Text style={[styles.text, textStyle]}>{title}</Text> : null}
+            {title ? <Text style={[styles.text, { color: foreground }, textStyle]}>{title}</Text> : null}
           </View>
         )}
       </LinearGradient>

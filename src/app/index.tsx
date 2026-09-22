@@ -487,9 +487,9 @@ export default function TaskHomeScreen() {
               accessibilityRole="button"
               accessibilityLabel={t('openSettings')}
               onPress={() => router.push('/settings' as any)}
-              style={[styles.iconButton, { backgroundColor: themeColors.brandSubtle }]}
+              style={[styles.iconButton, { backgroundColor: themeColors.accentSubtle }]}
             >
-              <Text style={[styles.iconButtonText, { color: themeColors.brand }]}>⚙</Text>
+              <Text style={[styles.iconButtonText, { color: themeColors.accentText }]}>⚙</Text>
             </TouchableOpacity>
           </View>
         </HomeTopBar>
@@ -501,10 +501,10 @@ export default function TaskHomeScreen() {
           </View>
         ) : !savedApiKey ? (
           <View style={styles.initialLoading}>
-            <View accessible={false} style={[styles.accentMark, { backgroundColor: themeColors.accent }]} />
             <Text style={[styles.initialLoadingTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
             <Text style={[styles.initialLoadingText, { color: themeColors.textSecondary }]}>{t('apiKeyStartHint')}</Text>
             <GradientButton
+              variant="accent"
               title={t('configureApiKey')}
               onPress={() => router.push('/settings' as any)}
               style={styles.primaryButton}
@@ -628,10 +628,11 @@ export default function TaskHomeScreen() {
                     {taskTemplates.map(template => (
                       <TouchableOpacity
                         key={template}
-                        style={[styles.templateChip, { backgroundColor: themeColors.chipBg }]}
+                        accessibilityState={{ selected: taskPrompt === template }}
+                        style={[styles.templateChip, { backgroundColor: taskPrompt === template ? themeColors.accentSubtle : themeColors.chipBg }]}
                         onPress={() => setTaskPrompt(template)}
                       >
-                        <Text style={[styles.templateText, { color: themeColors.textSecondary }]}>{template}</Text>
+                        <Text style={[styles.templateText, { color: taskPrompt === template ? themeColors.accentText : themeColors.textSecondary }]}>{template}</Text>
                       </TouchableOpacity>
                     ))}
                     {customPrompts.map(cp => (
@@ -669,7 +670,7 @@ export default function TaskHomeScreen() {
                     <Switch
                       value={requirePlanApproval}
                       onValueChange={setRequirePlanApproval}
-                      trackColor={{ false: themeColors.composerBorder, true: themeColors.brandSubtle }}
+                      trackColor={{ false: themeColors.composerBorder, true: themeColors.accentText }}
                       thumbColor={requirePlanApproval ? themeColors.brand : '#FFFFFF'}
                     />
                   </View>
@@ -681,7 +682,7 @@ export default function TaskHomeScreen() {
                     <Switch
                       value={autoCreatePr}
                       onValueChange={setAutoCreatePr}
-                      trackColor={{ false: themeColors.composerBorder, true: themeColors.brandSubtle }}
+                      trackColor={{ false: themeColors.composerBorder, true: themeColors.accentText }}
                       thumbColor={autoCreatePr ? themeColors.brand : '#FFFFFF'}
                     />
                   </View>
@@ -793,7 +794,7 @@ export default function TaskHomeScreen() {
                       {source.githubRepo?.isPrivate ? t('privateRepository') : t('githubRepository')} · {source.githubRepo?.defaultBranch?.displayName || t('noDefaultBranch')}
                     </Text>
                   </View>
-                  {selectedSourceName === source.name ? <Text style={[styles.selectedMark, { color: themeColors.brand }]}>✓</Text> : null}
+                  {selectedSourceName === source.name ? <Text style={[styles.selectedMark, { color: themeColors.accentText }]}>✓</Text> : null}
                 </TouchableOpacity>
               )) : availableBranches.map(branch => (
                 <TouchableOpacity
@@ -805,7 +806,7 @@ export default function TaskHomeScreen() {
                   }}
                 >
                   <Text style={[styles.sheetItemTitle, { color: themeColors.text }]}>{branch}</Text>
-                  {selectedBranch === branch ? <Text style={[styles.selectedMark, { color: themeColors.brand }]}>✓</Text> : null}
+                  {selectedBranch === branch ? <Text style={[styles.selectedMark, { color: themeColors.accentText }]}>✓</Text> : null}
                 </TouchableOpacity>
               ))}
               {pickerMode === 'branch' && availableBranches.length === 0 ? (
@@ -901,7 +902,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40, gap: 24 },
   initialLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 38, gap: 12 },
-  accentMark: { width: 32, height: 5, borderRadius: 3, marginBottom: 4 },
   initialLoadingTitle: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
   initialLoadingText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   hero: {
