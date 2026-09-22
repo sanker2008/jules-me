@@ -499,6 +499,7 @@ export default function TaskHomeScreen() {
           </View>
         ) : !savedApiKey ? (
           <View style={styles.initialLoading}>
+            <View accessible={false} style={[styles.accentMark, { backgroundColor: themeColors.accent }]} />
             <Text style={[styles.initialLoadingTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
             <Text style={[styles.initialLoadingText, { color: themeColors.textSecondary }]}>{t('apiKeyStartHint')}</Text>
             <GradientButton
@@ -525,7 +526,7 @@ export default function TaskHomeScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.heroHeaderCopy}>
-                  <Text style={[styles.eyebrow, { color: themeColors.brand }]}>{t('newTask')}</Text>
+                  <Text style={[styles.eyebrow, { color: themeColors.accentText }]}>{t('newTask')}</Text>
                   <Text style={[styles.heroHeaderTitle, { color: themeColors.text }]} numberOfLines={1}>
                     {isFormExpanded
                       ? t('heroTitle')
@@ -897,6 +898,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40, gap: 24 },
   initialLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 38, gap: 12 },
+  accentMark: { width: 32, height: 5, borderRadius: 3, marginBottom: 4 },
   initialLoadingTitle: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
   initialLoadingText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   hero: {

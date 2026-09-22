@@ -53,7 +53,7 @@ export function AppUpdateCard() {
         <View style={styles.stack}>
           <Text accessibilityLiveRegion="polite" style={textStyle}>{t('updateDownloading')} {Math.round(update.progress * 100)}%</Text>
           <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(update.progress * 100) }} style={[styles.track, { backgroundColor: colors.backgroundElement }]}>
-            <View style={[styles.fill, { width: `${Math.round(update.progress * 100)}%`, backgroundColor: colors.brand }]} />
+            <View style={[styles.fill, { width: `${Math.round(update.progress * 100)}%`, backgroundColor: colors.accent }]} />
           </View>
           <TouchableOpacity accessibilityRole="button" onPress={update.cancelDownload} style={styles.link}>
             <Text style={{ color: colors.brand }}>{t('cancel')}</Text>

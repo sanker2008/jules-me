@@ -320,7 +320,7 @@ export default function SettingsScreen() {
                   accessibilityState={{ selected: themePreference === option }}
                   style={[
                     styles.menuItem,
-                    themePreference === option && { backgroundColor: themeColors.brandSubtle },
+                    themePreference === option && { backgroundColor: themeColors.accentSubtle },
                   ]}
                   onPress={() => {
                     setShowThemeMenu(false);
@@ -330,7 +330,7 @@ export default function SettingsScreen() {
                   <Text style={[styles.menuItemText, { color: themePreference === option ? themeColors.brand : themeColors.text }]}>
                     {getThemeName(option, t)}
                   </Text>
-                  {themePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.brand }]}>✓</Text> : null}
+                  {themePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.accentText }]}>✓</Text> : null}
                 </TouchableOpacity>
               ))}
             </View>
@@ -368,7 +368,7 @@ export default function SettingsScreen() {
                   accessibilityState={{ selected: languagePreference === option }}
                   style={[
                     styles.menuItem,
-                    languagePreference === option && { backgroundColor: themeColors.brandSubtle },
+                    languagePreference === option && { backgroundColor: themeColors.accentSubtle },
                   ]}
                   onPress={() => {
                     setShowLanguageMenu(false);
@@ -378,7 +378,7 @@ export default function SettingsScreen() {
                   <Text style={[styles.menuItemText, { color: languagePreference === option ? themeColors.brand : themeColors.text }]}>
                     {getLanguageName(option)}
                   </Text>
-                  {languagePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.brand }]}>✓</Text> : null}
+                  {languagePreference === option ? <Text style={[styles.menuCheck, { color: themeColors.accentText }]}>✓</Text> : null}
                 </TouchableOpacity>
               ))}
             </View>
@@ -421,7 +421,7 @@ export default function SettingsScreen() {
           {isProActive ? (
             <View style={styles.instructionsActions}>
               {instructionsFeedback ? (
-                <Text style={[styles.instructionsFeedback, { color: themeColors.brand }]}>
+                <Text style={[styles.instructionsFeedback, { color: themeColors.accentText }]}>
                   ✓ {instructionsFeedback}
                 </Text>
               ) : <View />}
