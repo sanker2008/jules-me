@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   RefreshControl,
   ScrollView,
@@ -457,6 +458,7 @@ export default function TaskHomeScreen() {
       <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safeArea}>
         <HomeTopBar theme={theme} blurTarget={backgroundRef}>
           <View style={styles.brandRow}>
+            <Image accessible={false} source={require('@/assets/images/jules-logo-header.png')} style={styles.brandLogo} resizeMode="contain" />
             <View>
               <View style={styles.brandTitleRow}>
                 <Text style={[styles.brand, { color: themeColors.brand }]}>JulesMe</Text>
@@ -854,6 +856,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  brandLogo: { width: 42, height: 42 },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
