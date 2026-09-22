@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   RefreshControl,
   ScrollView,
@@ -30,7 +29,6 @@ import type { Translator } from '../i18n';
 import { useTheme } from '../hooks/use-theme';
 import { cleanPromptDisplay, getSingleRouteParam } from '../utils/jules-guards';
 import { getApiKey } from '../utils/secure-store';
-import { BreathingLogo } from '../components/breathing-logo';
 import { AmbientLogo } from '../components/ambient-logo';
 import { Chevron } from '../components/chevron';
 import { GradientButton } from '../components/gradient-button';
@@ -459,7 +457,6 @@ export default function TaskHomeScreen() {
       <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safeArea}>
         <HomeTopBar theme={theme} blurTarget={backgroundRef}>
           <View style={styles.brandRow}>
-            <Image source={require('@/assets/images/jules-logo.png')} style={styles.brandLogo} />
             <View>
               <View style={styles.brandTitleRow}>
                 <Text style={[styles.brand, { color: themeColors.brand }]}>JulesMe</Text>
@@ -502,13 +499,6 @@ export default function TaskHomeScreen() {
           </View>
         ) : !savedApiKey ? (
           <View style={styles.initialLoading}>
-            <BreathingLogo
-              size={72}
-              borderRadius={16}
-              glowColor={themeColors.brandSubtle}
-              isPro={proState.isPro}
-              style={{ marginBottom: 16 }}
-            />
             <Text style={[styles.initialLoadingTitle, { color: themeColors.text }]}>{t('connectJules')}</Text>
             <Text style={[styles.initialLoadingText, { color: themeColors.textSecondary }]}>{t('apiKeyStartHint')}</Text>
             <GradientButton
@@ -876,17 +866,6 @@ const styles = StyleSheet.create({
   topBarProBadge: {
     marginLeft: 2,
   },
-  brandLogo: {
-    width: 42,
-    height: 42,
-    borderRadius: 9,
-  },
-  landingLogo: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
   brand: {
     fontSize: 22,
     lineHeight: 26,
@@ -918,7 +897,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40, gap: 24 },
   initialLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 38, gap: 12 },
-  initialLoadingTitle: { fontSize: 22, fontWeight: '800' },
+  initialLoadingTitle: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
   initialLoadingText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   hero: {
     borderRadius: 8,

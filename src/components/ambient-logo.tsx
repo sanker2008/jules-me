@@ -63,8 +63,13 @@ export function AmbientLogo({ theme }: { theme: 'light' | 'dark' }) {
           position: 'absolute',
           width: size,
           height: size,
-          top: height * 0.34 - size / 2,
-          opacity: theme === 'dark' ? 0.18 : 0.12,
+          top: height * 0.44 - size / 2,
+          opacity: reduceMotion
+            ? (theme === 'dark' ? 0.18 : 0.12)
+            : progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: theme === 'dark' ? [0.12, 0.24] : [0.08, 0.18],
+            }),
           transform: reduceMotion ? [] : [
             { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [7, -7] }) },
             { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.06] }) },
